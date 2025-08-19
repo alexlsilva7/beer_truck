@@ -2,9 +2,40 @@
 
 Este é um projeto de jogo desenvolvido com Python e OpenGL.
 
+Versão do Python: 3.13.6
+
+Recomendado utilizar o PyCharm que possui suporte nativo para projetos Python e facilita a gestão de ambientes virtuais.
+
 ## Configuração do Ambiente Virtual
 
-### Ativar o ambiente virtual:
+### 1. Verificar se o venv está instalado:
+```cmd
+python -m venv --help
+```
+
+Se o comando acima retornar erro, instale o venv:
+
+**Ubuntu/Debian:**
+```bash
+sudo apt install python3-venv
+```
+
+**CentOS/RHEL/Fedora:**
+```bash
+sudo yum install python3-venv
+# ou para versões mais recentes:
+sudo dnf install python3-venv
+```
+
+**Windows/Mac:**
+O venv já vem incluído com Python 3.3+
+
+### 2. Criar o ambiente virtual:
+```cmd
+python -m venv .venv
+```
+
+### 3. Ativar o ambiente virtual:
 
 **Windows (Command Prompt):**
 ```cmd
@@ -13,22 +44,22 @@ Este é um projeto de jogo desenvolvido com Python e OpenGL.
 
 **Windows (PowerShell):**
 ```powershell
-.venv\Scripts\activate.ps1
+.venv\Scripts\Activate.ps1
 ```
 
 **Linux/Mac ou Git Bash:**
 ```bash
-source .venv/Scripts/activate
+source .venv/bin/activate
 ```
 
-### Desativar o ambiente virtual:
-```cmd
-deactivate
-```
-
-### Instalar dependências:
+### 4. Instalar dependências:
 ```cmd
 pip install -r requirements.txt
+```
+
+### 5. Desativar o ambiente virtual:
+```cmd
+deactivate
 ```
 
 ## Dependências incluídas:
