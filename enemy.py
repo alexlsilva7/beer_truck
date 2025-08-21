@@ -5,7 +5,7 @@ from road import ROAD_WIDTH, GAME_WIDTH, SCREEN_HEIGHT, LANE_WIDTH, LANE_COUNT_P
 
 
 class Enemy:
-    def __init__(self, texture_id, is_up_lane=True):
+    def __init__(self, texture_id, is_up_lane=True, lane_index=None):
         """Inicializa as propriedades do inimigo com uma textura específica."""
         self.texture_id = texture_id
         self.width = 50
@@ -13,14 +13,20 @@ class Enemy:
         self.crashed = False
 
         road_x_start_total = (GAME_WIDTH - ROAD_WIDTH) / 2
+        if lane_index is None:
+            if is_up_lane:
+                # Faixas da direita (contramão)
+                self.lane_index = random.randint(LANE_COUNT_PER_DIRECTION, LANE_COUNT_PER_DIRECTION * 2 - 1)
+            else:
+                # Faixas da esquerda (mesma direção)
+                self.lane_index = random.randint(0, LANE_COUNT_PER_DIRECTION - 1)
+        else:
+            self.lane_index = lane_index
+
         if is_up_lane:
-            # Faixas da direita (contramão)
-            self.lane_index = random.randint(LANE_COUNT_PER_DIRECTION, LANE_COUNT_PER_DIRECTION * 2 - 1)
             # Velocidade alta (velocidade do jogador + velocidade própria)
             self.speed_y = PLAYER_SPEED + random.uniform(0.1, 0.3)
         else:
-            # Faixas da esquerda (mesma direção)
-            self.lane_index = random.randint(0, LANE_COUNT_PER_DIRECTION - 1)
             # Velocidade menor que a do jogador
             self.speed_y = random.uniform(0.05, PLAYER_SPEED - 0.05)
 
@@ -65,6 +71,6 @@ class Enemy:
 
 
 class EnemyDown(Enemy):
-    def __init__(self, texture_id):
+    def __init__(self, texture_id, lane_index=None):
         """Inicializa um inimigo que aparece nas faixas da esquerda."""
-        super().__init__(texture_id, is_up_lane=False)
+        super().__init__(texture_id, is_up_lane=False, lane_index=lane_index)

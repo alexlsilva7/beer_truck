@@ -6,7 +6,7 @@ import sys
 import os
 import random
 
-from road import draw_road, SCREEN_WIDTH, SCREEN_HEIGHT, GAME_WIDTH, PANEL_WIDTH, COLOR_PANEL, draw_rect, PLAYER_SPEED
+from road import draw_road, SCREEN_WIDTH, SCREEN_HEIGHT, GAME_WIDTH, PANEL_WIDTH, COLOR_PANEL, draw_rect, PLAYER_SPEED, ROAD_WIDTH, LANE_COUNT_PER_DIRECTION, LANE_WIDTH
 from truck import Truck
 from enemy import Enemy, EnemyDown
 from texture_loader import load_texture
@@ -14,6 +14,7 @@ from texture_loader import load_texture
 # --- Variáveis Globais ---
 scroll_pos = 0.0
 scroll_speed = -PLAYER_SPEED
+safety_distance = 150  # Distância mínima para spawnar um novo inimigo na mesma faixa
 
 
 def key_callback(window, key, scancode, action, mods):
@@ -110,14 +111,34 @@ def main():
         spawn_timer_up += 0.1
         if spawn_timer_up >= spawn_rate:
             spawn_timer_up = 0
-            random_texture = random.choice(enemy_textures_up)
-            enemies_up.append(Enemy(random_texture))
+            # Encontrar faixas livres para up
+            up_lanes = range(LANE_COUNT_PER_DIRECTION, LANE_COUNT_PER_DIRECTION * 2)
+            possible_lanes = []
+            for lane in up_lanes:
+                max_y_in_lane = max((e.y for e in enemies_up if e.lane_index == lane), default=0)
+                if SCREEN_HEIGHT - (max_y_in_lane + safety_distance) > 0:
+                    possible_lanes.append(lane)
+            if possible_lanes:
+                chosen_lane = random.choice(possible_lanes)
+                random_texture = random.choice(enemy_textures_up)
+                new_enemy = Enemy(random_texture, lane_index=chosen_lane)
+                enemies_up.append(new_enemy)
 
         spawn_timer_down += 0.15
         if spawn_timer_down >= spawn_rate:
             spawn_timer_down = 0
-            random_texture = random.choice(enemy_textures_down)
-            enemies_down.append(EnemyDown(random_texture))
+            # Encontrar faixas livres para down
+            down_lanes = range(0, LANE_COUNT_PER_DIRECTION)
+            possible_lanes = []
+            for lane in down_lanes:
+                max_y_in_lane = max((e.y for e in enemies_down if e.lane_index == lane), default=0)
+                if SCREEN_HEIGHT - (max_y_in_lane + safety_distance) > 0:
+                    possible_lanes.append(lane)
+            if possible_lanes:
+                chosen_lane = random.choice(possible_lanes)
+                random_texture = random.choice(enemy_textures_down)
+                new_enemy = EnemyDown(random_texture, lane_index=chosen_lane)
+                enemies_down.append(new_enemy)
 
         # --- Atualização e Colisão dos Inimigos ---
         all_enemies = enemies_up + enemies_down
