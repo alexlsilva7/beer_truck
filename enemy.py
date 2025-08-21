@@ -24,11 +24,11 @@ class Enemy:
             self.lane_index = lane_index
 
         if is_up_lane:
-            # Velocidade alta (velocidade do jogador + velocidade própria)
-            self.speed_y = PLAYER_SPEED + random.uniform(0.1, 0.3)
+            # Velocidade ajustada para inimigos na contramão (menos rápida)
+            self.speed_y =  random.uniform(0.02, 0.07)
         else:
-            # Velocidade menor que a do jogador
-            self.speed_y = random.uniform(0.05, PLAYER_SPEED - 0.05)
+            # Velocidade ajustada para inimigos na mesma direção (mais rápida)
+            self.speed_y = PLAYER_SPEED + random.uniform(0.02, 0.1 )
 
         lane_x_start = road_x_start_total + self.lane_index * LANE_WIDTH
         self.x = lane_x_start + (LANE_WIDTH - self.width) / 2

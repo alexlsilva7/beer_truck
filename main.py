@@ -14,7 +14,7 @@ from texture_loader import load_texture
 # --- Variáveis Globais ---
 scroll_pos = 0.0
 scroll_speed = -PLAYER_SPEED
-safety_distance = 150  # Distância mínima para spawnar um novo inimigo na mesma faixa
+safety_distance = 180  # Distância mínima para spawnar um novo inimigo na mesma faixa
 
 
 def key_callback(window, key, scancode, action, mods):
@@ -81,7 +81,7 @@ def main():
     enemies_down = []
     spawn_timer_up = 0
     spawn_timer_down = 0
-    spawn_rate = 150
+    spawn_rate = 1000
 
     while not glfw.window_should_close(window):
         glfw.poll_events()
