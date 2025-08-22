@@ -5,9 +5,10 @@ from road import ROAD_WIDTH, GAME_WIDTH, SCREEN_HEIGHT, LANE_WIDTH, LANE_COUNT_P
 
 
 class Enemy:
-    def __init__(self, texture_id, is_up_lane=True, lane_index=None):
+    def __init__(self, texture_id, dead_texture_id=None, is_up_lane=True, lane_index=None):
         """Inicializa as propriedades do inimigo com uma textura específica."""
         self.texture_id = texture_id
+        self.dead_texture_id = dead_texture_id
         self.width = 50
         self.height = 100
         self.crashed = False
@@ -59,7 +60,11 @@ class Enemy:
         glEnable(GL_TEXTURE_2D)
         glEnable(GL_BLEND)
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
-        glBindTexture(GL_TEXTURE_2D, self.texture_id)
+
+        # Usa textura "dead" se o inimigo colidiu e tem textura dead
+        current_texture = self.dead_texture_id if self.crashed and self.dead_texture_id else self.texture_id
+        glBindTexture(GL_TEXTURE_2D, current_texture)
+
         glBegin(GL_QUADS)
         glTexCoord2f(0, 1); glVertex2f(self.x, self.y)
         glTexCoord2f(1, 1); glVertex2f(self.x + self.width, self.y)
@@ -71,6 +76,6 @@ class Enemy:
 
 
 class EnemyDown(Enemy):
-    def __init__(self, texture_id, lane_index=None):
+    def __init__(self, texture_id, dead_texture_id=None, lane_index=None):
         """Inicializa um inimigo que aparece nas faixas da esquerda."""
-        super().__init__(texture_id, is_up_lane=False, lane_index=lane_index)
+        super().__init__(texture_id, dead_texture_id, is_up_lane=False, lane_index=lane_index)

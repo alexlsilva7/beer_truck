@@ -3,9 +3,10 @@ from road import ROAD_WIDTH, GAME_WIDTH, SCREEN_HEIGHT
 
 
 class Truck:
-    def __init__(self, texture_id):
+    def __init__(self, texture_id, dead_texture_id=None):
         """Inicializa as propriedades do caminhão."""
         self.texture_id = texture_id
+        self.dead_texture_id = dead_texture_id
         self.width = 50
         self.height = 100
         self.x = (GAME_WIDTH - self.width) / 2
@@ -21,7 +22,9 @@ class Truck:
         glEnable(GL_BLEND)
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
 
-        glBindTexture(GL_TEXTURE_2D, self.texture_id)
+        # Usa textura "dead" se o caminhão colidiu e tem textura dead
+        current_texture = self.dead_texture_id if self.crashed and self.dead_texture_id else self.texture_id
+        glBindTexture(GL_TEXTURE_2D, current_texture)
 
         glBegin(GL_QUADS)
         # Define os cantos da textura e do retângulo

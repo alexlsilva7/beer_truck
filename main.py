@@ -54,6 +54,8 @@ def main():
     script_dir = os.path.dirname(os.path.abspath(__file__))
     truck_texture_path = os.path.join(script_dir, "assets/sprite_racing.png")
     truck_texture = load_texture(truck_texture_path)
+    truck_dead_texture_path = os.path.join(script_dir, "assets/sprite_racing_dead.png")
+    truck_dead_texture = load_texture(truck_dead_texture_path)
 
     enemy_textures_up = []
     enemy_asset_names_up = ["up_black.png", "up_green.png", "up_red.png", "up_yellow.png"]
@@ -71,17 +73,39 @@ def main():
         if texture:
             enemy_textures_down.append(texture)
 
-    if not truck_texture or not enemy_textures_up or not enemy_textures_down:
+    # Carregar texturas "dead" para inimigos up
+    enemy_dead_textures_up = []
+    enemy_dead_asset_names_up = ["up_black_dead.png", "up_green_dead.png", "up_red_dead.png", "up_yellow_dead.png"]
+    for asset_name in enemy_dead_asset_names_up:
+        path = os.path.join(script_dir, "assets", asset_name)
+        texture = load_texture(path)
+        if texture:
+            enemy_dead_textures_up.append(texture)
+
+    # Carregar texturas "dead" para inimigos down
+    enemy_dead_textures_down = []
+    enemy_dead_asset_names_down = ["down_black_dead.png", "down_green_dead.png", "down_red_dead.png", "down_yellow_dead.png"]
+    for asset_name in enemy_dead_asset_names_down:
+        path = os.path.join(script_dir, "assets", asset_name)
+        texture = load_texture(path)
+        if texture:
+            enemy_dead_textures_down.append(texture)
+
+    if not truck_texture or not truck_dead_texture or not enemy_textures_up or not enemy_textures_down:
         glfw.terminate()
         sys.exit("Falha ao carregar uma ou mais texturas.")
 
-    player_truck = Truck(truck_texture)
+    player_truck = Truck(truck_texture, truck_dead_texture)
 
     enemies_up = []
     enemies_down = []
     spawn_timer_up = 0
     spawn_timer_down = 0
     spawn_rate = 1000
+
+    # Combinar texturas normais e dead para facilitar o spawn
+    enemy_up_texture_pairs = list(zip(enemy_textures_up, enemy_dead_textures_up))
+    enemy_down_texture_pairs = list(zip(enemy_textures_down, enemy_dead_textures_down))
 
     while not glfw.window_should_close(window):
         glfw.poll_events()
@@ -120,8 +144,8 @@ def main():
                     possible_lanes.append(lane)
             if possible_lanes:
                 chosen_lane = random.choice(possible_lanes)
-                random_texture = random.choice(enemy_textures_up)
-                new_enemy = Enemy(random_texture, lane_index=chosen_lane)
+                normal_texture, dead_texture = random.choice(enemy_up_texture_pairs)
+                new_enemy = Enemy(normal_texture, dead_texture, lane_index=chosen_lane)
                 enemies_up.append(new_enemy)
 
         spawn_timer_down += 0.15
@@ -136,8 +160,8 @@ def main():
                     possible_lanes.append(lane)
             if possible_lanes:
                 chosen_lane = random.choice(possible_lanes)
-                random_texture = random.choice(enemy_textures_down)
-                new_enemy = EnemyDown(random_texture, lane_index=chosen_lane)
+                normal_texture, dead_texture = random.choice(enemy_down_texture_pairs)
+                new_enemy = EnemyDown(normal_texture, dead_texture, lane_index=chosen_lane)
                 enemies_down.append(new_enemy)
 
         # --- Atualização e Colisão dos Inimigos ---
