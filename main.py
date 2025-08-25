@@ -247,8 +247,26 @@ def main():
                 if not player_truck.crashed and not enemy.crashed and player_truck.check_collision(enemy):
                     player_truck.crashed = True
                     enemy.crashed = True
+                # inimigos crashados continuam sendo empurrados pelo scroll
                 if enemy.crashed:
                     enemy.y += scroll_speed
+
+            # Propagação de colisão: inimigos crashados que ainda estão na tela
+            # podem colidir com outros inimigos e marcá-los como crashados.
+            def _rects_overlap(a, b):
+                return (a.x < b.x + b.width and
+                        a.x + a.width > b.x and
+                        a.y < b.y + b.height and
+                        a.y + a.height > b.y)
+
+            for a in all_enemies:
+                if not a.crashed:
+                    continue
+                for b in all_enemies:
+                    if a is b or b.crashed:
+                        continue
+                    if _rects_overlap(a, b):
+                        b.crashed = True
 
             enemies_up = [e for e in enemies_up if e.y > -e.height]
             enemies_down = [e for e in enemies_down if e.y > -e.height]
