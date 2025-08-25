@@ -213,9 +213,16 @@ def main():
                 elif glfw.get_key(window, glfw.KEY_DOWN) == glfw.PRESS: dy = scroll_speed / player_truck.speed_y
                 player_truck.move(dx, dy)
             else:
+                # Empurra o caminhão com o scroll quando está crashado
                 player_truck.y += scroll_speed
+                # Só encerra o jogo quando o caminhão saiu da tela E
+                # todos os inimigos marcados como crashados também já tiverem saído.
                 if player_truck.y + player_truck.height < 0:
-                    current_game_state = GAME_STATE_GAME_OVER
+                    crashed_enemies = [e for e in enemies_up + enemies_down if e.crashed]
+                    # considera apenas inimigos que ainda estão visíveis na tela
+                    remaining_crashed_visible = [e for e in crashed_enemies if e.y + e.height >= 0]
+                    if not remaining_crashed_visible:
+                        current_game_state = GAME_STATE_GAME_OVER
 
             scroll_pos += scroll_speed
 
@@ -244,7 +251,10 @@ def main():
             all_enemies = enemies_up + enemies_down
             for enemy in all_enemies:
                 enemy.update(all_enemies)
-                if not player_truck.crashed and not enemy.crashed and player_truck.check_collision(enemy):
+                # Marca inimigos que colidem com o caminhão mesmo que o caminhão
+                # já tenha sido marcado como crashado no mesmo frame, para suportar
+                # colisões múltiplas quando o caminhão estiver entre duas faixas.
+                if not enemy.crashed and player_truck.check_collision(enemy):
                     player_truck.crashed = True
                     enemy.crashed = True
                 # inimigos crashados continuam sendo empurrados pelo scroll
