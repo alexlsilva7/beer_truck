@@ -358,9 +358,9 @@ def main():
 
             if current_game_state == GAME_STATE_MENU:
                 if menu_state.active_menu == "main":
-                    # Obtém o high score atual para exibir no menu
-                    highest_score = high_score_manager.get_highest_score()
-                    draw_start_menu(menu_state, mouse_x, mouse_y, highest_score)
+                    # Obtém todos os recordes para exibir o top 3
+                    top_scores = high_score_manager.get_top_scores()
+                    draw_start_menu(menu_state, mouse_x, mouse_y, {"scores": top_scores, "highest": high_score_manager.get_highest_score()})
                 elif menu_state.active_menu == "instructions":
                     draw_instructions_screen(menu_state, mouse_x, mouse_y)
             else:  # GAME_STATE_GAME_OVER

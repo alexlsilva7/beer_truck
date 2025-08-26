@@ -3,6 +3,7 @@ from OpenGL.GL import *
 from OpenGL.GLU import *
 from OpenGL.GLUT import *
 from road import SCREEN_WIDTH, SCREEN_HEIGHT, draw_rect
+import high_score_manager  # Importa o gerenciador de recordes
 
 # --- Cores para o Menu ---
 COLOR_MENU_BG_TOP = (0.1, 0.1, 0.2)
@@ -125,26 +126,34 @@ def draw_menu_background():
     glEnable(GL_TEXTURE_2D)
 
 
-def draw_start_menu(menu_state, mouse_x, mouse_y, highest_score=None):
+def draw_start_menu(menu_state, mouse_x, mouse_y, high_score_data=None):
     """Desenha a tela inicial do menu."""
     draw_menu_background()
     draw_title()
 
-    # Exibe o high score atual ou uma mensagem indicando que não há recordes
-    if highest_score and highest_score["score"] > 0:
-        high_score_text = f"HIGH SCORE: {highest_score['name']} - {highest_score['score']}"
-        draw_text_centered(high_score_text, SCREEN_WIDTH / 2, SCREEN_HEIGHT - 180, color=COLOR_HIGH_SCORE)
+    # Exibe o Top 3
+    draw_text_centered("TOP 3 RECORDES", SCREEN_WIDTH / 2, SCREEN_HEIGHT - 180, font=GLUT_BITMAP_TIMES_ROMAN_24, color=COLOR_HIGH_SCORE)
+
+    if high_score_data and high_score_data["scores"]:
+        positions = ["1º", "2º", "3º"]
+        for i, score in enumerate(high_score_data["scores"]):
+            y_pos = SCREEN_HEIGHT - 220 - (i * 30)
+            score_text = f"{positions[i]}: {score['name']} - {score['score']}"
+            draw_text_centered(score_text, SCREEN_WIDTH / 2, y_pos, color=COLOR_HIGH_SCORE)
     else:
-        draw_text_centered("Nenhum recorde ainda! Seja o primeiro!", SCREEN_WIDTH / 2, SCREEN_HEIGHT - 180, color=COLOR_HIGH_SCORE)
+        draw_text_centered("Nenhum recorde ainda! Seja o primeiro!", SCREEN_WIDTH / 2, SCREEN_HEIGHT - 220, color=COLOR_HIGH_SCORE)
 
     button_width = 250
     button_height = 50
     button_x = (SCREEN_WIDTH - button_width) / 2
     
+    # Ajusta a posição dos botões para ficarem abaixo dos recordes
+    button_base_y = SCREEN_HEIGHT / 2 - 50
+
     buttons = [
-        {"text": "INICIAR JOGO", "y": SCREEN_HEIGHT / 2, "action": "start"},
-        {"text": "COMO JOGAR", "y": SCREEN_HEIGHT / 2 - 70, "action": "instructions"},
-        {"text": "SAIR", "y": SCREEN_HEIGHT / 2 - 140, "action": "quit"}
+        {"text": "INICIAR JOGO", "y": button_base_y, "action": "start"},
+        {"text": "COMO JOGAR", "y": button_base_y - 70, "action": "instructions"},
+        {"text": "SAIR", "y": button_base_y - 140, "action": "quit"}
     ]
 
     hovered_button = None

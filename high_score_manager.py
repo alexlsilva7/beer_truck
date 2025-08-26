@@ -31,12 +31,12 @@ class HighScoreManager:
         self.high_scores.append({"name": name, "score": score})
         # Ordena por pontuação em ordem decrescente
         self.high_scores = sorted(self.high_scores, key=lambda x: x["score"], reverse=True)
-        # Mantém apenas os top 10
-        if len(self.high_scores) > 10:
-            self.high_scores = self.high_scores[:10]
+        # Mantém apenas os top 3
+        if len(self.high_scores) > 3:
+            self.high_scores = self.high_scores[:3]
         self.save_high_scores()
 
-    def get_top_scores(self, limit=10):
+    def get_top_scores(self, limit=3):
         """Retorna os melhores scores até o limite especificado."""
         return self.high_scores[:limit]
 
@@ -48,6 +48,12 @@ class HighScoreManager:
 
     def is_high_score(self, score):
         """Verifica se a pontuação é um novo high score."""
-        if len(self.high_scores) < 10:
+        if not self.high_scores:  # Se não houver pontuações salvas
             return True
-        return score > min([hs["score"] for hs in self.high_scores])
+
+        if len(self.high_scores) < 3:  # Se há menos de 3 recordes
+            return score > 0  # Aceita qualquer pontuação maior que zero
+
+        # Se tiver 3 recordes, verifica se a pontuação é maior que o menor deles
+        lowest_score = self.high_scores[-1]["score"] if self.high_scores else 0
+        return score > lowest_score
