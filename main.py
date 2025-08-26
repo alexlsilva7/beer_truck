@@ -2,6 +2,7 @@ import glfw
 from OpenGL.GL import *
 from OpenGL.GLU import *
 from OpenGL.GLUT import *
+from OpenGL.GLUT import GLUT_BITMAP_HELVETICA_18  # Importação explícita para evitar erro
 import sys
 import os
 import random
@@ -10,8 +11,9 @@ from road import draw_road, SCREEN_WIDTH, SCREEN_HEIGHT, GAME_WIDTH, PANEL_WIDTH
 from truck import Truck
 from enemy import Enemy, EnemyDown
 from texture_loader import load_texture
-from menu import MenuState, draw_start_menu, draw_instructions_screen, draw_game_over_menu
+from menu import MenuState, draw_start_menu, draw_instructions_screen, draw_game_over_menu, draw_name_input_screen
 from difficulty_manager import DifficultyManager
+from high_score_manager import HighScoreManager
 
 # --- Estados do Jogo ---
 GAME_STATE_MENU = 0
@@ -23,12 +25,16 @@ scroll_pos = 0.0
 scroll_speed = -PLAYER_SPEED
 safety_distance = 180
 difficulty_manager = DifficultyManager()
+high_score_manager = HighScoreManager()
 current_game_state = GAME_STATE_MENU
 menu_state = MenuState()
+player_name = ""
+asking_for_name = False
+new_high_score = False
 
 # --- Callbacks de Input ---
 def key_callback(window, key, scancode, action, mods):
-    global current_game_state, difficulty_manager
+    global current_game_state, difficulty_manager, player_name, asking_for_name, new_high_score
 
     if key == glfw.KEY_ESCAPE and action == glfw.PRESS:
         if current_game_state == GAME_STATE_PLAYING:
@@ -39,6 +45,25 @@ def key_callback(window, key, scancode, action, mods):
                 menu_state.active_menu = "main"
             else:
                 glfw.set_window_should_close(window, True)
+        elif current_game_state == GAME_STATE_GAME_OVER and asking_for_name:
+            # Se estiver pedindo o nome e ESC for pressionado, cancela a entrada
+            asking_for_name = False
+            player_name = ""
+
+    # Controle da entrada do nome do jogador
+    if asking_for_name and action == glfw.PRESS:
+        if key == glfw.KEY_BACKSPACE and len(player_name) > 0:
+            player_name = player_name[:-1]
+        elif key == glfw.KEY_ENTER:
+            # Finaliza a entrada do nome e salva o high score
+            if len(player_name) > 0:
+                score = abs(scroll_pos * 0.1)
+                high_score_manager.add_high_score(player_name, int(score))
+                asking_for_name = False
+        elif 32 <= key <= 126:  # ASCII imprimível (espaço até ~)
+            # Limita o tamanho do nome a 15 caracteres
+            if len(player_name) < 15:
+                player_name += chr(key)
 
     # Controles manuais para dificuldade (F1-F7)
     if action == glfw.PRESS:
@@ -59,7 +84,7 @@ def key_callback(window, key, scancode, action, mods):
             difficulty_manager.toggle_manual_control()
 
 def mouse_button_callback(window, button, action, mods):
-    global current_game_state
+    global current_game_state, asking_for_name
 
     if button == glfw.MOUSE_BUTTON_LEFT:
         if action == glfw.PRESS:
@@ -86,14 +111,40 @@ def mouse_button_callback(window, button, action, mods):
                         menu_state.active_menu = "main"
 
             elif current_game_state == GAME_STATE_GAME_OVER:
-                hovered_button = get_hovered_button_game_over_menu(mouse_x, mouse_y)
-                if hovered_button == "restart":
-                    current_game_state = GAME_STATE_PLAYING
-                    reset_game()
-                elif hovered_button == "main":
-                    current_game_state = GAME_STATE_MENU
-                    menu_state.active_menu = "main"
-                    reset_game()
+                # Se estiver pedindo o nome do jogador, não processa cliques nos botões de game over
+                if asking_for_name:
+                    # Verificar se o clique foi no botão de confirmar
+                    input_box_x = (SCREEN_WIDTH - 400) / 2
+                    input_box_y = SCREEN_HEIGHT / 2 - 25
+                    if input_box_x <= mouse_x <= input_box_x + 400 and input_box_y <= mouse_y <= input_box_y + 50:
+                        # Clique na caixa de entrada, não faz nada (continua esperando entrada de teclado)
+                        pass
+                    else:
+                        # Clique em outros botões da tela de input
+                        button_width = 200
+                        button_x = (SCREEN_WIDTH - button_width) / 2
+                        button_y = 100
+
+                        # Botão confirmar
+                        if button_x <= mouse_x <= button_x + button_width and button_y <= mouse_y <= button_y + 50:
+                            if len(player_name) > 0:
+                                score = abs(scroll_pos * 0.1)
+                                high_score_manager.add_high_score(player_name, int(score))
+                                asking_for_name = False
+
+                        # Botão voltar
+                        elif button_x <= mouse_x <= button_x + button_width and button_y + 70 <= mouse_y <= button_y + 70 + 50:
+                            asking_for_name = False
+                else:
+                    # Comportamento normal de game over quando não está pedindo o nome
+                    hovered_button = get_hovered_button_game_over_menu(mouse_x, mouse_y)
+                    if hovered_button == "restart":
+                        current_game_state = GAME_STATE_PLAYING
+                        reset_game()
+                    elif hovered_button == "main":
+                        current_game_state = GAME_STATE_MENU
+                        menu_state.active_menu = "main"
+                        reset_game()
 
 # --- Funções Auxiliares de Menu ---
 def get_hovered_button_main_menu(mouse_x, mouse_y):
@@ -130,7 +181,7 @@ def get_hovered_button_game_over_menu(mouse_x, mouse_y):
     return None
 
 def reset_game():
-    global scroll_pos, player_truck, enemies_up, enemies_down, spawn_timer_up, spawn_timer_down
+    global scroll_pos, player_truck, enemies_up, enemies_down, spawn_timer_up, spawn_timer_down, player_name, asking_for_name, new_high_score
     scroll_pos = 0.0
     player_truck.reset()
     enemies_up.clear()
@@ -138,6 +189,9 @@ def reset_game():
     spawn_timer_up = 0
     difficulty_manager.reset()
     spawn_timer_down = 0
+    player_name = ""
+    asking_for_name = False
+    new_high_score = False
     glfw.set_time(0) # Reseta o tempo
 
 
@@ -223,6 +277,12 @@ def main():
                     remaining_crashed_visible = [e for e in crashed_enemies if e.y + e.height >= 0]
                     if not remaining_crashed_visible:
                         current_game_state = GAME_STATE_GAME_OVER
+                        # Verifica se a pontuação atual é um novo high score
+                        final_score = int(abs(scroll_pos * 0.1))
+                        global new_high_score, asking_for_name
+                        new_high_score = high_score_manager.is_high_score(final_score)
+                        if new_high_score:
+                            asking_for_name = True
 
             scroll_pos += scroll_speed
 
@@ -298,12 +358,21 @@ def main():
 
             if current_game_state == GAME_STATE_MENU:
                 if menu_state.active_menu == "main":
-                    draw_start_menu(menu_state, mouse_x, mouse_y)
+                    # Obtém o high score atual para exibir no menu
+                    highest_score = high_score_manager.get_highest_score()
+                    draw_start_menu(menu_state, mouse_x, mouse_y, highest_score)
                 elif menu_state.active_menu == "instructions":
                     draw_instructions_screen(menu_state, mouse_x, mouse_y)
             else:  # GAME_STATE_GAME_OVER
                 final_score = abs(scroll_pos * 0.1)
-                draw_game_over_menu(final_score, menu_state, mouse_x, mouse_y)
+                highest_score = high_score_manager.get_highest_score()
+
+                if asking_for_name:
+                    # Se estiver pedindo o nome do jogador
+                    draw_name_input_screen(menu_state, mouse_x, mouse_y, player_name)
+                else:
+                    # Tela normal de game over
+                    draw_game_over_menu(final_score, menu_state, mouse_x, mouse_y, highest_score, new_high_score)
 
         elif current_game_state == GAME_STATE_PLAYING:
             # --- Game Viewport ---
