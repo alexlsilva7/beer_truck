@@ -158,9 +158,13 @@ def draw_start_menu(menu_state, mouse_x, mouse_y, high_score_data=None):
 
     hovered_button = None
     for i, button in enumerate(buttons):
+        # Inverte a coordenada Y do mouse para corresponder ao sistema do OpenGL
+        inverted_mouse_y = SCREEN_HEIGHT - mouse_y
+
+        # Verifica se o mouse está dentro da área do botão
         is_hovered = (button_x <= mouse_x <= button_x + button_width and
-                      button["y"] <= mouse_y <= button["y"] + button_height)
-        
+                     button["y"] <= inverted_mouse_y <= button["y"] + button_height)
+
         is_pressed = is_hovered and menu_state.mouse_pressed
         
         draw_button(button_x, button["y"], button_width, button_height, button["text"], is_hovered, is_pressed)
@@ -198,8 +202,11 @@ def draw_instructions_screen(menu_state, mouse_x, mouse_y):
     button_x = (SCREEN_WIDTH - button_width) / 2
     button_y = 100
     
+    # Inverte a coordenada Y do mouse para corresponder ao sistema do OpenGL
+    inverted_mouse_y = SCREEN_HEIGHT - mouse_y
+
     is_hovered = (button_x <= mouse_x <= button_x + button_width and
-                  button_y <= mouse_y <= button_y + button_height)
+                  button_y <= inverted_mouse_y <= button_y + button_height)
     is_pressed = is_hovered and menu_state.mouse_pressed
 
     draw_button(button_x, button_y, button_width, button_height, "VOLTAR", is_hovered, is_pressed)
@@ -248,10 +255,13 @@ def draw_game_over_menu(score, menu_state, mouse_x, mouse_y, highest_score=None,
         {"text": "MENU PRINCIPAL", "y": SCREEN_HEIGHT / 2 - 120 + button_offset, "action": "main"}
     ]
     
+    # Inverte a coordenada Y do mouse para corresponder ao sistema do OpenGL
+    inverted_mouse_y = SCREEN_HEIGHT - mouse_y
+
     hovered_button = None
     for button in buttons:
         is_hovered = (button_x <= mouse_x <= button_x + button_width and
-                      button["y"] <= mouse_y <= button["y"] + button_height)
+                      button["y"] <= inverted_mouse_y <= button["y"] + button_height)
         is_pressed = is_hovered and menu_state.mouse_pressed
         draw_button(button_x, button["y"], button_width, button_height, button["text"], is_hovered, is_pressed)
         if is_hovered:
@@ -282,8 +292,11 @@ def draw_high_scores_screen(high_scores, menu_state, mouse_x, mouse_y):
     button_x = (SCREEN_WIDTH - button_width) / 2
     button_y = 100
 
+    # Inverte a coordenada Y do mouse para corresponder ao sistema do OpenGL
+    inverted_mouse_y = SCREEN_HEIGHT - mouse_y
+
     is_hovered = (button_x <= mouse_x <= button_x + button_width and
-                  button_y <= mouse_y <= button_y + button_height)
+                  button_y <= inverted_mouse_y <= button_y + button_height)
     is_pressed = is_hovered and menu_state.mouse_pressed
 
     draw_button(button_x, button_y, button_width, button_height, "VOLTAR", is_hovered, is_pressed)
@@ -313,8 +326,11 @@ def draw_name_input_screen(menu_state, mouse_x, mouse_y, input_text=""):
     button_x = (SCREEN_WIDTH - button_width) / 2
     button_y = 100
 
+    # Inverte a coordenada Y do mouse para corresponder ao sistema do OpenGL
+    inverted_mouse_y = SCREEN_HEIGHT - mouse_y
+
     is_hovered_confirm = (button_x <= mouse_x <= button_x + button_width and
-                  button_y <= mouse_y <= button_y + button_height)
+                  button_y <= inverted_mouse_y <= button_y + button_height)
     is_pressed_confirm = is_hovered_confirm and menu_state.mouse_pressed
 
     draw_button(button_x, button_y, button_width, button_height, "CONFIRMAR", is_hovered_confirm, is_pressed_confirm)
@@ -324,7 +340,7 @@ def draw_name_input_screen(menu_state, mouse_x, mouse_y, input_text=""):
 
     # Botão de Voltar
     is_hovered_back = (button_x <= mouse_x <= button_x + button_width and
-                  button_y + 70 <= mouse_y <= button_y + 70 + button_height)
+                  button_y + 70 <= inverted_mouse_y <= button_y + 70 + button_height)
     is_pressed_back = is_hovered_back and menu_state.mouse_pressed
 
     draw_button(button_x, button_y + 70, button_width, button_height, "VOLTAR", is_hovered_back, is_pressed_back)

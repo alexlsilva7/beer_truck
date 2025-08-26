@@ -92,8 +92,6 @@ def mouse_button_callback(window, button, action, mods):
         elif action == glfw.RELEASE:
             menu_state.mouse_pressed = False
             mouse_x, mouse_y = glfw.get_cursor_pos(window)
-            # Inverte o Y do mouse para corresponder ao sistema de coordenadas do OpenGL
-            mouse_y = SCREEN_HEIGHT - mouse_y
 
             if current_game_state == GAME_STATE_MENU:
                 if menu_state.active_menu == "main":
@@ -116,7 +114,7 @@ def mouse_button_callback(window, button, action, mods):
                     # Verificar se o clique foi no botão de confirmar
                     input_box_x = (SCREEN_WIDTH - 400) / 2
                     input_box_y = SCREEN_HEIGHT / 2 - 25
-                    if input_box_x <= mouse_x <= input_box_x + 400 and input_box_y <= mouse_y <= input_box_y + 50:
+                    if input_box_x <= mouse_x <= input_box_x + 400 and SCREEN_HEIGHT - mouse_y >= input_box_y and SCREEN_HEIGHT - mouse_y <= input_box_y + 50:
                         # Clique na caixa de entrada, não faz nada (continua esperando entrada de teclado)
                         pass
                     else:
@@ -126,14 +124,14 @@ def mouse_button_callback(window, button, action, mods):
                         button_y = 100
 
                         # Botão confirmar
-                        if button_x <= mouse_x <= button_x + button_width and button_y <= mouse_y <= button_y + 50:
+                        if button_x <= mouse_x <= button_x + button_width and SCREEN_HEIGHT - mouse_y >= button_y and SCREEN_HEIGHT - mouse_y <= button_y + 50:
                             if len(player_name) > 0:
                                 score = abs(scroll_pos * 0.1)
                                 high_score_manager.add_high_score(player_name, int(score))
                                 asking_for_name = False
 
                         # Botão voltar
-                        elif button_x <= mouse_x <= button_x + button_width and button_y + 70 <= mouse_y <= button_y + 70 + 50:
+                        elif button_x <= mouse_x <= button_x + button_width and SCREEN_HEIGHT - mouse_y >= button_y + 70 and SCREEN_HEIGHT - mouse_y <= button_y + 70 + 50:
                             asking_for_name = False
                 else:
                     # Comportamento normal de game over quando não está pedindo o nome
@@ -150,13 +148,15 @@ def mouse_button_callback(window, button, action, mods):
 def get_hovered_button_main_menu(mouse_x, mouse_y):
     button_width = 250
     button_x = (SCREEN_WIDTH - button_width) / 2
+    # Inverte a coordenada Y do mouse para corresponder ao sistema do OpenGL
+    inverted_mouse_y = SCREEN_HEIGHT - mouse_y
     buttons = [
-        {"y": SCREEN_HEIGHT / 2, "action": "start"},
-        {"y": SCREEN_HEIGHT / 2 - 70, "action": "instructions"},
-        {"y": SCREEN_HEIGHT / 2 - 140, "action": "quit"}
+        {"y": SCREEN_HEIGHT / 2 - 50, "action": "start"},
+        {"y": SCREEN_HEIGHT / 2 - 120, "action": "instructions"},
+        {"y": SCREEN_HEIGHT / 2 - 190, "action": "quit"}
     ]
     for btn in buttons:
-        if button_x <= mouse_x <= button_x + button_width and btn["y"] <= mouse_y <= btn["y"] + 50:
+        if button_x <= mouse_x <= button_x + button_width and btn["y"] <= inverted_mouse_y <= btn["y"] + 50:
             return btn["action"]
     return None
 
@@ -164,19 +164,23 @@ def get_hovered_button_instructions_menu(mouse_x, mouse_y):
     button_width = 200
     button_x = (SCREEN_WIDTH - button_width) / 2
     button_y = 100
-    if button_x <= mouse_x <= button_x + button_width and button_y <= mouse_y <= button_y + 50:
+    # Inverte a coordenada Y do mouse para corresponder ao sistema do OpenGL
+    inverted_mouse_y = SCREEN_HEIGHT - mouse_y
+    if button_x <= mouse_x <= button_x + button_width and button_y <= inverted_mouse_y <= button_y + 50:
         return "main"
     return None
 
 def get_hovered_button_game_over_menu(mouse_x, mouse_y):
     button_width = 250
     button_x = (SCREEN_WIDTH - button_width) / 2
+    # Inverte a coordenada Y do mouse para corresponder ao sistema do OpenGL
+    inverted_mouse_y = SCREEN_HEIGHT - mouse_y
     buttons = [
         {"y": SCREEN_HEIGHT / 2 - 50, "action": "restart"},
         {"y": SCREEN_HEIGHT / 2 - 120, "action": "main"}
     ]
     for btn in buttons:
-        if button_x <= mouse_x <= button_x + button_width and btn["y"] <= mouse_y <= btn["y"] + 50:
+        if button_x <= mouse_x <= button_x + button_width and btn["y"] <= inverted_mouse_y <= btn["y"] + 50:
             return btn["action"]
     return None
 
