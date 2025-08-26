@@ -179,7 +179,6 @@ $RECYCLE.BIN/
 # Temporary files
 *.tmp
 *.temp
-*.log
 *.swp
 *.swo
 
