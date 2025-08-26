@@ -1,3 +1,4 @@
+glfw==2.9.0
 PyOpenGL==3.1.10
 PyGLFW==0.2.2
 Pillow==11.3.0
