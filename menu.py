@@ -130,10 +130,12 @@ def draw_start_menu(menu_state, mouse_x, mouse_y, highest_score=None):
     draw_menu_background()
     draw_title()
 
-    # Exibe o high score atual, se disponível
-    if highest_score:
+    # Exibe o high score atual ou uma mensagem indicando que não há recordes
+    if highest_score and highest_score["score"] > 0:
         high_score_text = f"HIGH SCORE: {highest_score['name']} - {highest_score['score']}"
         draw_text_centered(high_score_text, SCREEN_WIDTH / 2, SCREEN_HEIGHT - 180, color=COLOR_HIGH_SCORE)
+    else:
+        draw_text_centered("Nenhum recorde ainda! Seja o primeiro!", SCREEN_WIDTH / 2, SCREEN_HEIGHT - 180, color=COLOR_HIGH_SCORE)
 
     button_width = 250
     button_height = 50
