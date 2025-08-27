@@ -376,7 +376,7 @@ def main():
                     draw_name_input_screen(menu_state, mouse_x, mouse_y, player_name)
                 else:
                     # Tela normal de game over
-                    draw_game_over_menu(final_score, menu_state, mouse_x, mouse_y, highest_score, new_high_score)
+                    draw_game_over_menu(final_score, menu_state, mouse_x, mouse_y, highest_score, new_high_score, player_name)
 
         elif current_game_state == GAME_STATE_PLAYING:
             # --- Game Viewport ---

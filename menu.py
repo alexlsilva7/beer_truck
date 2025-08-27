@@ -216,7 +216,7 @@ def draw_instructions_screen(menu_state, mouse_x, mouse_y):
     return None
 
 
-def draw_game_over_menu(score, menu_state, mouse_x, mouse_y, highest_score=None, is_new_high_score=False):
+def draw_game_over_menu(score, menu_state, mouse_x, mouse_y, highest_score=None, is_new_high_score=False, player_name=""):
     """Desenha a tela de game over."""
     draw_menu_background()
 
@@ -238,7 +238,8 @@ def draw_game_over_menu(score, menu_state, mouse_x, mouse_y, highest_score=None,
         new_hs_y = score_y - 80
         draw_text_centered("NOVO RECORDE!", SCREEN_WIDTH / 2, new_hs_y, font=GLUT_BITMAP_TIMES_ROMAN_24, color=COLOR_NEW_HIGH_SCORE)
         instructions_y = new_hs_y - 40
-        draw_text_centered("Digite seu nome e pressione ENTER", SCREEN_WIDTH / 2, instructions_y, font=GLUT_BITMAP_HELVETICA_18)
+        if not player_name:  # Só mostra a mensagem se o jogador ainda não começou a digitar
+            draw_text_centered("Digite seu nome e pressione ENTER", SCREEN_WIDTH / 2, instructions_y, font=GLUT_BITMAP_HELVETICA_18)
 
     # Botões
     button_width = 250
