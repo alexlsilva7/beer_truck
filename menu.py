@@ -216,7 +216,7 @@ def draw_instructions_screen(menu_state, mouse_x, mouse_y):
     return None
 
 
-def draw_game_over_menu(score, menu_state, mouse_x, mouse_y, highest_score=None, is_new_high_score=False, player_name=""):
+def draw_game_over_menu(score, menu_state, mouse_x, mouse_y, top_scores=None, is_new_high_score=False, player_name=""):
     """Desenha a tela de game over."""
     draw_menu_background()
 
@@ -227,15 +227,20 @@ def draw_game_over_menu(score, menu_state, mouse_x, mouse_y, highest_score=None,
     score_y = title_y - 60
     draw_text_centered(f"Sua pontuação: {int(score)}", SCREEN_WIDTH / 2, score_y, font=GLUT_BITMAP_HELVETICA_18)
 
-    # High Score atual
-    if highest_score:
+    # Top 3 recordes
+    if top_scores:
+        positions = ["1º", "2º", "3º"]
         high_score_y = score_y - 40
-        high_score_text = f"High Score: {highest_score['name']} - {highest_score['score']}"
-        draw_text_centered(high_score_text, SCREEN_WIDTH / 2, high_score_y, font=GLUT_BITMAP_HELVETICA_18, color=COLOR_HIGH_SCORE)
+        draw_text_centered("TOP 3 RECORDES", SCREEN_WIDTH / 2, high_score_y, font=GLUT_BITMAP_HELVETICA_18, color=COLOR_HIGH_SCORE)
+
+        for i, score_data in enumerate(top_scores):
+            y_pos = high_score_y - 30 - (i * 30)
+            score_text = f"{positions[i]}: {score_data['name']} - {score_data['score']}"
+            draw_text_centered(score_text, SCREEN_WIDTH / 2, y_pos, font=GLUT_BITMAP_HELVETICA_18, color=COLOR_HIGH_SCORE)
 
     # Destaque para novo high score
     if is_new_high_score:
-        new_hs_y = score_y - 80
+        new_hs_y = high_score_y - 120  # Ajustado para ficar abaixo do top 3
         draw_text_centered("NOVO RECORDE!", SCREEN_WIDTH / 2, new_hs_y, font=GLUT_BITMAP_TIMES_ROMAN_24, color=COLOR_NEW_HIGH_SCORE)
         instructions_y = new_hs_y - 40
         if not player_name:  # Só mostra a mensagem se o jogador ainda não começou a digitar

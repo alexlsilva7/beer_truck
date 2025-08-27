@@ -369,14 +369,14 @@ def main():
                     draw_instructions_screen(menu_state, mouse_x, mouse_y)
             else:  # GAME_STATE_GAME_OVER
                 final_score = abs(scroll_pos * 0.1)
-                highest_score = high_score_manager.get_highest_score()
+                top_scores = high_score_manager.get_top_scores()
 
                 if asking_for_name:
                     # Se estiver pedindo o nome do jogador
                     draw_name_input_screen(menu_state, mouse_x, mouse_y, player_name)
                 else:
                     # Tela normal de game over
-                    draw_game_over_menu(final_score, menu_state, mouse_x, mouse_y, highest_score, new_high_score, player_name)
+                    draw_game_over_menu(final_score, menu_state, mouse_x, mouse_y, top_scores, new_high_score, player_name)
 
         elif current_game_state == GAME_STATE_PLAYING:
             # --- Game Viewport ---
