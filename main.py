@@ -6,9 +6,11 @@ import sys
 import os
 import random
 
-from road import draw_road, SCREEN_WIDTH, SCREEN_HEIGHT, GAME_WIDTH, PANEL_WIDTH, COLOR_PANEL, draw_rect, PLAYER_SPEED, ROAD_WIDTH, LANE_COUNT_PER_DIRECTION, LANE_WIDTH
+from road import draw_road, SCREEN_WIDTH, SCREEN_HEIGHT, GAME_WIDTH, PANEL_WIDTH, COLOR_PANEL, draw_rect, PLAYER_SPEED, \
+    ROAD_WIDTH, LANE_COUNT_PER_DIRECTION, LANE_WIDTH
 from truck import Truck
 from enemy import Enemy, EnemyDown
+from police import PoliceCar  # Importa a nova classe
 from texture_loader import load_texture
 from menu import MenuState, draw_start_menu, draw_instructions_screen, draw_game_over_menu
 from difficulty_manager import DifficultyManager
@@ -25,6 +27,10 @@ safety_distance = 180
 difficulty_manager = DifficultyManager()
 current_game_state = GAME_STATE_MENU
 menu_state = MenuState()
+police_car = None  # Variável para controlar o carro da polícia
+
+# --- Constantes da Polícia ---
+POLICE_SPAWN_SCORE_THRESHOLD = 200
 
 # --- Callbacks de Input ---
 def key_callback(window, key, scancode, action, mods):
@@ -57,6 +63,7 @@ def key_callback(window, key, scancode, action, mods):
             difficulty_manager.adjust_enemy_speed_multiplier(-0.1)
         elif key == glfw.KEY_F7:
             difficulty_manager.toggle_manual_control()
+
 
 def mouse_button_callback(window, button, action, mods):
     global current_game_state
@@ -130,16 +137,16 @@ def get_hovered_button_game_over_menu(mouse_x, mouse_y):
     return None
 
 def reset_game():
-    global scroll_pos, player_truck, enemies_up, enemies_down, spawn_timer_up, spawn_timer_down
+    global scroll_pos, player_truck, enemies_up, enemies_down, spawn_timer_up, spawn_timer_down, police_car
     scroll_pos = 0.0
     player_truck.reset()
     enemies_up.clear()
     enemies_down.clear()
+    police_car = None
     spawn_timer_up = 0
     difficulty_manager.reset()
     spawn_timer_down = 0
-    glfw.set_time(0) # Reseta o tempo
-
+    glfw.set_time(0)
 
 def draw_text(text, x, y):
     glDisable(GL_TEXTURE_2D)
@@ -149,7 +156,7 @@ def draw_text(text, x, y):
         glutBitmapCharacter(GLUT_BITMAP_HELVETICA_18, ord(character))
 
 def main():
-    global current_game_state, scroll_pos, player_truck, enemies_up, enemies_down, spawn_timer_up, spawn_timer_down
+    global current_game_state, scroll_pos, player_truck, enemies_up, enemies_down, spawn_timer_up, spawn_timer_down, police_car
 
     if not glfw.init():
         sys.exit("Could not initialize GLFW.")
@@ -169,19 +176,31 @@ def main():
     script_dir = os.path.dirname(os.path.abspath(__file__))
     truck_texture = load_texture(os.path.join(script_dir, "assets/sprite_racing.png"))
     truck_dead_texture = load_texture(os.path.join(script_dir, "assets/sprite_racing_dead.png"))
-    enemy_textures_up = [load_texture(os.path.join(script_dir, f"assets/up_{color}.png")) for color in ["black", "green", "red", "yellow"]]
-    enemy_textures_down = [load_texture(os.path.join(script_dir, f"assets/down_{color}.png")) for color in ["black", "green", "red", "yellow"]]
-    enemy_dead_textures_up = [load_texture(os.path.join(script_dir, f"assets/up_{color}_dead.png")) for color in ["black", "green", "red", "yellow"]]
-    enemy_dead_textures_down = [load_texture(os.path.join(script_dir, f"assets/down_{color}_dead.png")) for color in ["black", "green", "red", "yellow"]]
+    enemy_textures_up = [load_texture(os.path.join(script_dir, f"assets/up_{color}.png")) for color in
+                         ["black", "green", "red", "yellow"]]
+    enemy_textures_down = [load_texture(os.path.join(script_dir, f"assets/down_{color}.png")) for color in
+                           ["black", "green", "red", "yellow"]]
+    enemy_dead_textures_up = [load_texture(os.path.join(script_dir, f"assets/up_{color}_dead.png")) for color in
+                              ["black", "green", "red", "yellow"]]
+    enemy_dead_textures_down = [load_texture(os.path.join(script_dir, f"assets/down_{color}_dead.png")) for color in
+                                ["black", "green", "red", "yellow"]]
 
-    if not all([truck_texture, truck_dead_texture] + enemy_textures_up + enemy_textures_down + enemy_dead_textures_up + enemy_dead_textures_down):
+    # Carrega texturas da polícia
+    police_textures = {
+        'normal_1': load_texture(os.path.join(script_dir, "assets/police_1.png")),
+        'normal_2': load_texture(os.path.join(script_dir, "assets/police_2.png")),
+        'dead': load_texture(os.path.join(script_dir, "assets/police_dead.png"))
+    }
+
+    if not all([truck_texture,
+                truck_dead_texture] + enemy_textures_up + enemy_textures_down + enemy_dead_textures_up + enemy_dead_textures_down + list(
+            police_textures.values())):
         glfw.terminate()
         sys.exit("Failed to load one or more textures.")
 
     player_truck = Truck(truck_texture, truck_dead_texture)
     enemies_up, enemies_down = [], []
     spawn_timer_up, spawn_timer_down = 0, 0
-    spawn_rate = 1000
 
     enemy_up_texture_pairs = list(zip(enemy_textures_up, enemy_dead_textures_up))
     enemy_down_texture_pairs = list(zip(enemy_textures_down, enemy_dead_textures_down))
@@ -209,8 +228,10 @@ def main():
                 dx, dy = 0.0, 0.0
                 if glfw.get_key(window, glfw.KEY_LEFT) == glfw.PRESS: dx -= 0.1
                 if glfw.get_key(window, glfw.KEY_RIGHT) == glfw.PRESS: dx += 0.1
-                if glfw.get_key(window, glfw.KEY_UP) == glfw.PRESS: dy = 0.1
-                elif glfw.get_key(window, glfw.KEY_DOWN) == glfw.PRESS: dy = scroll_speed / player_truck.speed_y
+                if glfw.get_key(window, glfw.KEY_UP) == glfw.PRESS:
+                    dy = 0.1
+                elif glfw.get_key(window, glfw.KEY_DOWN) == glfw.PRESS:
+                    dy = scroll_speed / player_truck.speed_y
                 player_truck.move(dx, dy)
             else:
                 # Empurra o caminhão com o scroll quando está crashado
@@ -225,6 +246,22 @@ def main():
                         current_game_state = GAME_STATE_GAME_OVER
 
             scroll_pos += scroll_speed
+
+            # --- Police Spawning ---
+            if police_car is None and score > POLICE_SPAWN_SCORE_THRESHOLD:
+                # A chance aumenta com a pontuação
+                spawn_chance = random.uniform(0, 1) * (score / 5000000.0)
+                print(f"Police spawn chance: {spawn_chance:.4f}")
+                if random.random() < spawn_chance:
+                    print(f"Police car spawned at score {score:.0f}!")
+                    police_car = PoliceCar(police_textures)
+
+            # --- Police Update ---
+            if police_car:
+                police_car.update(player_truck, enemies_up + enemies_down, scroll_speed)
+                # Se a polícia sair da tela por cima ou por baixo, remove-a
+                if police_car.y > SCREEN_HEIGHT or police_car.y + police_car.height < 0:
+                    police_car = None
 
             # --- Enemy Spawning ---
             spawn_timer_up += 0.1
@@ -251,9 +288,7 @@ def main():
             all_enemies = enemies_up + enemies_down
             for enemy in all_enemies:
                 enemy.update(all_enemies)
-                # Marca inimigos que colidem com o caminhão mesmo que o caminhão
-                # já tenha sido marcado como crashado no mesmo frame, para suportar
-                # colisões múltiplas quando o caminhão estiver entre duas faixas.
+                # Marca inimigos que colidem com o caminhão
                 if not enemy.crashed and player_truck.check_collision(enemy):
                     player_truck.crashed = True
                     enemy.crashed = True
@@ -261,15 +296,18 @@ def main():
                 if enemy.crashed:
                     enemy.y += scroll_speed
 
-            # Propagação de colisão: inimigos crashados que ainda estão na tela
-            # podem colidir com outros inimigos e marcá-los como crashados.
+            # Propagação de colisão: inimigos crashados podem colidir com outros
             def _rects_overlap(a, b):
                 return (a.x < b.x + b.width and
                         a.x + a.width > b.x and
                         a.y < b.y + b.height and
                         a.y + a.height > b.y)
 
-            for a in all_enemies:
+            all_cars_on_road = all_enemies
+            if police_car:
+                all_cars_on_road.append(police_car)
+
+            for a in all_cars_on_road:
                 if not a.crashed:
                     continue
                 for b in all_enemies:
@@ -320,6 +358,10 @@ def main():
                 enemy.draw()
             for enemy in enemies_down:
                 enemy.draw()
+
+            # Desenha o carro da polícia se ele existir
+            if police_car:
+                police_car.draw()
 
             # --- Panel Viewport ---
             glViewport(GAME_WIDTH, 0, PANEL_WIDTH, SCREEN_HEIGHT)
