@@ -179,7 +179,6 @@ $RECYCLE.BIN/
 # Temporary files
 *.tmp
 *.temp
-*.log
 *.swp
 *.swo
 
@@ -187,3 +186,4 @@ $RECYCLE.BIN/
 *.save
 config.ini
 settings.json
+/highscores.json
