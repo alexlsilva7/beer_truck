@@ -11,7 +11,7 @@ from road import draw_road, SCREEN_WIDTH, SCREEN_HEIGHT, GAME_WIDTH, PANEL_WIDTH
 from truck import Truck
 from enemy import Enemy, EnemyDown
 from texture_loader import load_texture
-from menu import MenuState, draw_start_menu, draw_instructions_screen, draw_game_over_menu, draw_name_input_screen
+from menu import MenuState, draw_start_menu, draw_instructions_screen, draw_game_over_menu, draw_name_input_screen, draw_lives
 from difficulty_manager import DifficultyManager
 from high_score_manager import HighScoreManager
 
@@ -206,6 +206,43 @@ def draw_text(text, x, y):
     for character in text:
         glutBitmapCharacter(GLUT_BITMAP_HELVETICA_18, ord(character))
 
+def draw_heart(x, y, size=8, color=(1.0, 0.3, 0.3), filled=True):
+    """Desenha um coração usando primitivas geométricas do OpenGL"""
+    glDisable(GL_TEXTURE_2D)
+    glColor3f(color[0], color[1], color[2])
+    
+    import math
+    
+    if filled:
+        # Coração preenchido usando uma abordagem mais precisa
+        glBegin(GL_TRIANGLE_FAN)
+        glVertex2f(x, y)  # Centro
+        
+        # Criar pontos do coração usando a equação paramétrica
+        for i in range(37):  # 36 pontos + volta ao início
+            t = i * 2 * math.pi / 36
+            # Equação paramétrica do coração
+            heart_x = x + size * (16 * math.sin(t)**3) / 16
+            heart_y = y + size * (13 * math.cos(t) - 5 * math.cos(2*t) - 2 * math.cos(3*t) - math.cos(4*t)) / 13
+            glVertex2f(heart_x, heart_y)
+        
+        glEnd()
+    else:
+        # Coração vazado (apenas contorno)
+        glLineWidth(2.0)
+        glBegin(GL_LINE_LOOP)
+        
+        # Criar pontos do contorno do coração
+        for i in range(36):
+            t = i * 2 * math.pi / 36
+            # Equação paramétrica do coração
+            heart_x = x + size * (16 * math.sin(t)**3) / 16
+            heart_y = y + size * (13 * math.cos(t) - 5 * math.cos(2*t) - 2 * math.cos(3*t) - math.cos(4*t)) / 13
+            glVertex2f(heart_x, heart_y)
+        
+        glEnd()
+        glLineWidth(1.0)
+
 def main():
     global current_game_state, scroll_pos, player_truck, enemies_up, enemies_down, spawn_timer_up, spawn_timer_down
 
@@ -264,6 +301,9 @@ def main():
             scroll_speed = -current_scroll_speed
 
             if not player_truck.crashed:
+                # Atualiza o estado do caminhão (verifica invulnerabilidade)
+                player_truck.update()
+                
                 dx, dy = 0.0, 0.0
                 if glfw.get_key(window, glfw.KEY_LEFT) == glfw.PRESS: dx -= 0.1
                 if glfw.get_key(window, glfw.KEY_RIGHT) == glfw.PRESS: dx += 0.1
@@ -319,8 +359,11 @@ def main():
                 # já tenha sido marcado como crashado no mesmo frame, para suportar
                 # colisões múltiplas quando o caminhão estiver entre duas faixas.
                 if not enemy.crashed and player_truck.check_collision(enemy):
-                    player_truck.crashed = True
+                    # O inimigo sempre fica crashed quando há colisão
                     enemy.crashed = True
+                    # O caminhão toma dano usando o sistema de vidas
+                    player_truck.take_damage()
+                
                 # inimigos crashados continuam sendo empurrados pelo scroll
                 if enemy.crashed:
                     enemy.y += scroll_speed
@@ -412,8 +455,32 @@ def main():
             draw_text(f"Time: {int(time_elapsed)}", 12, SCREEN_HEIGHT - 28)
             draw_text(f"Speed: {speed:.0f} km/h", 12, SCREEN_HEIGHT - 52)
             draw_text(f"Score: {int(score)}", 12, SCREEN_HEIGHT - 76)
+            
+            # Exibe as vidas usando corações desenhados geometricamente
+            draw_text("Lives:", 12, SCREEN_HEIGHT - 100)
+            lives_x = 80
+            for i in range(player_truck.lives):
+                if player_truck.invulnerable:
+                    # Pisca durante invulnerabilidade
+                    import time
+                    blink = int(time.time() * 6) % 2
+                    if blink:
+                        color = (1.0, 1.0, 0.3)  # Amarelo
+                    else:
+                        color = (1.0, 0.3, 0.3)  # Vermelho
+                else:
+                    color = (1.0, 0.3, 0.3)  # Vermelho normal
+                
+                draw_heart(lives_x + i * 25, SCREEN_HEIGHT - 95, size=10, color=color, filled=True)
+            
+            # Desenha corações vazios para vidas perdidas
+            for i in range(player_truck.lives, 3):
+                draw_heart(lives_x + i * 25, SCREEN_HEIGHT - 95, size=10, color=(0.5, 0.5, 0.5), filled=False)
+            
+            # Reseta a cor para branco
+            glColor3f(1.0, 1.0, 1.0)
 
-            title_y = SCREEN_HEIGHT - 110
+            title_y = SCREEN_HEIGHT - 130
 
             # Dados da difficulty
             difficulty_info = difficulty_manager.get_difficulty_info()

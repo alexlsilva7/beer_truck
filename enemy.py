@@ -65,6 +65,9 @@ class Enemy:
         # Usa textura "dead" se o inimigo colidiu e tem textura dead
         current_texture = self.dead_texture_id if self.crashed and self.dead_texture_id else self.texture_id
         glBindTexture(GL_TEXTURE_2D, current_texture)
+        
+        # Garante que a cor está resetada
+        glColor4f(1.0, 1.0, 1.0, 1.0)
 
         glBegin(GL_QUADS)
         glTexCoord2f(0, 1); glVertex2f(self.x, self.y)
@@ -72,6 +75,9 @@ class Enemy:
         glTexCoord2f(1, 0); glVertex2f(self.x + self.width, self.y + self.height)
         glTexCoord2f(0, 0); glVertex2f(self.x, self.y + self.height)
         glEnd()
+        
+        # Reseta a cor para não afetar outros elementos
+        glColor4f(1.0, 1.0, 1.0, 1.0)
         glDisable(GL_TEXTURE_2D)
         glDisable(GL_BLEND)
 
