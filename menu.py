@@ -2,6 +2,7 @@ import ctypes
 from OpenGL.GL import *
 from OpenGL.GLU import *
 from OpenGL.GLUT import *
+from OpenGL.GLUT import GLUT_BITMAP_HELVETICA_18, GLUT_BITMAP_TIMES_ROMAN_24  
 from road import SCREEN_WIDTH, SCREEN_HEIGHT, draw_rect
 import high_score_manager  # Importa o gerenciador de recordes
 
@@ -64,6 +65,23 @@ def draw_text_centered(text, center_x, y, font=GLUT_BITMAP_HELVETICA_18, color=C
     x = int(center_x - text_width / 2)
     y = int(y)
     draw_text(text, x, y, font, color)
+
+def draw_lives(lives, x, y, invulnerable=False):
+    """Desenha as vidas do jogador usando símbolos simples."""
+    # Desenha símbolos cheios para vidas restantes
+    for i in range(lives):
+        if invulnerable:
+            # Pisca durante invulnerabilidade
+            import time
+            blink = int(time.time() * 6) % 2  # Pisca mais rápido
+            color = (1.0, 1.0, 0.3) if blink else (1.0, 0.3, 0.3)  # Alterna entre amarelo e vermelho
+        else:
+            color = (1.0, 0.3, 0.3)  # Vermelho normal
+        draw_text("*", x + i * 15, y, color=color)
+    
+    # Desenha símbolos vazios para vidas perdidas (máximo 3)
+    for i in range(lives, 3):
+        draw_text("o", x + i * 15, y, color=(0.5, 0.5, 0.5))
 
 def draw_button(x, y, width, height, text, is_hovered=False, is_pressed=False):
     """Desenha um botão com texto e bordas arredondadas."""
