@@ -425,7 +425,7 @@ def main():
             
             # --- Hole Update & Collision ---
             for hole in holes:
-                hole.update()
+                hole.update(scroll_speed)  # Passa a velocidade atual de rolagem
                 if hole.active and player_truck.check_hole_collision(hole):
                     # Buraco desaparece após uso
                     hole.active = False
@@ -467,7 +467,7 @@ def main():
             
             # --- Oil Stain Update & Collision ---
             for oil_stain in oil_stains:
-                oil_stain.update()
+                oil_stain.update(scroll_speed)  # Passa a velocidade atual de rolagem
                 if oil_stain.active and player_truck.check_oil_stain_collision(oil_stain):
                     # Mancha desaparece após uso
                     oil_stain.active = False
