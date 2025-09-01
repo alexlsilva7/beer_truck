@@ -25,9 +25,14 @@ class Truck:
         self.slow_down_duration = 1.5  # Duração do efeito de diminuição de velocidade
         self.slow_down_factor = 0.5  # Reduz a velocidade para 50%
         self.current_speed_factor = 1.0  # Fator de velocidade atual (começa em 100%)
+        
+        # Novas propriedades para o efeito de inversão de controles (mancha de óleo)
+        self.controls_inverted = False
+        self.controls_inverted_start_time = 0
+        self.controls_inverted_duration = 3.0  # Duração do efeito de inversão de controles (3 segundos)
 
     def update(self):
-        """Atualiza o estado do caminhão (invulnerabilidade e efeito de diminuição de velocidade)."""
+        """Atualiza o estado do caminhão (invulnerabilidade, diminuição de velocidade e inversão de controles)."""
         current_time = time.time()
         
         # Verifica invulnerabilidade
@@ -43,18 +48,12 @@ class Truck:
                 # Terminou o efeito completamente
                 self.slowed_down = False
                 self.current_speed_factor = 1.0
-            else:
-                # Cálculo do período de recuperação gradual
-                recovery_start = self.slow_down_duration * 0.6  # Inicia a recuperação em 60% do tempo total
                 
-                if elapsed_time >= recovery_start:
-                    # Cálculo do fator de velocidade durante a recuperação
-                    recovery_progress = (elapsed_time - recovery_start) / (self.slow_down_duration - recovery_start)
-                    # Interpola linearmente do slow_down_factor até 1.0
-                    self.current_speed_factor = self.slow_down_factor + (1.0 - self.slow_down_factor) * recovery_progress
-                else:
-                    # Mantém o fator de desaceleração no início do efeito
-                    self.current_speed_factor = self.slow_down_factor
+        # Verifica efeito de inversão de controles
+        if self.controls_inverted:
+            if current_time - self.controls_inverted_start_time >= self.controls_inverted_duration:
+                # Terminou o efeito de inversão
+                self.controls_inverted = False
 
     def draw(self):
         """Desenha o caminhão na tela usando sua textura."""
@@ -76,6 +75,11 @@ class Truck:
         elif self.slowed_down:
             # Efeito visual para quando está com velocidade reduzida (cor azulada)
             glColor4f(0.7, 0.7, 1.0, 1.0)
+        elif self.controls_inverted:
+            # Efeito visual para quando os controles estão invertidos (cor avermelhada)
+            blink_speed = 4  # Velocidade do piscar mais lento
+            red_intensity = 0.7 + 0.3 * abs((time.time() * blink_speed) % 2 - 1)
+            glColor4f(1.0, 0.5 * red_intensity, 0.5 * red_intensity, 1.0)
         else:
             glColor4f(1.0, 1.0, 1.0, 1.0)
 
@@ -99,6 +103,11 @@ class Truck:
 
     def move(self, dx, dy):
         """Move o caminhão nas direções x e y."""
+        # Inverte os controles se o efeito estiver ativo
+        if self.controls_inverted:
+            dx = -dx
+            dy = -dy
+            
         # Aplica o efeito de diminuição de velocidade se necessário
         actual_speed_x = self.speed_x * (self.current_speed_factor if self.slowed_down else 1.0)
         actual_speed_y = self.speed_y * (self.current_speed_factor if self.slowed_down else 1.0)
@@ -146,6 +155,25 @@ class Truck:
         # Verifica se os centros estão próximos o suficiente
         return (abs(truck_center_x - hole_center_x) < max_x_distance and
                 abs(truck_center_y - hole_center_y) < max_y_distance)
+        
+    def check_oil_stain_collision(self, oil_stain):
+        """Verifica a colisão com uma mancha de óleo."""
+        if not oil_stain.active or self.crashed:
+            return False
+        
+        # Usando um sistema de colisão baseado no centro e com área ajustada
+        truck_center_x = self.x + self.width / 2
+        truck_center_y = self.y + self.height / 2
+        
+        oil_center_x = oil_stain.x + oil_stain.width / 2
+        oil_center_y = oil_stain.y + oil_stain.height / 2
+        
+        # Distância máxima para considerar colisão
+        max_x_distance = (self.width + oil_stain.width) / 3
+        max_y_distance = (self.height + oil_stain.height) / 3
+        
+        return (abs(truck_center_x - oil_center_x) < max_x_distance and
+                abs(truck_center_y - oil_center_y) < max_y_distance)
 
     def take_damage(self):
         """O caminhão perde uma vida e fica temporariamente invulnerável."""
@@ -169,6 +197,14 @@ class Truck:
             self.current_speed_factor = self.slow_down_factor  # Aplica o fator de redução imediatamente
             return True  # Indica que o efeito foi aplicado
         return False  # Já estava com velocidade reduzida
+        
+    def invert_controls(self):
+        """O caminhão sofre um efeito de inversão de controles."""
+        if not self.controls_inverted:
+            self.controls_inverted = True
+            self.controls_inverted_start_time = time.time()
+            return True  # Indica que o efeito foi aplicado
+        return False  # Já estava com controles invertidos
 
     def reset(self):
         """Reseta o caminhão para a posição inicial."""
@@ -181,4 +217,5 @@ class Truck:
         self.slowed_down = False
         self.slow_down_start_time = 0
         self.current_speed_factor = 1.0
-        self.slow_down_start_time = 0
+        self.controls_inverted = False
+        self.controls_inverted_start_time = 0
