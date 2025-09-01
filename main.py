@@ -11,7 +11,9 @@ from road import draw_road, SCREEN_WIDTH, SCREEN_HEIGHT, GAME_WIDTH, PANEL_WIDTH
     ROAD_WIDTH, LANE_COUNT_PER_DIRECTION, LANE_WIDTH
 from truck import Truck
 from enemy import Enemy, EnemyDown
-from police import PoliceCar  # Importa a nova classe
+from police import PoliceCar
+from hole import Hole
+from oil_stain import OilStain
 from texture_loader import load_texture
 from menu import MenuState, draw_start_menu, draw_instructions_screen, draw_game_over_menu, draw_name_input_screen, draw_lives
 from difficulty_manager import DifficultyManager
@@ -38,6 +40,10 @@ POLICE_SPAWN_SCORE_THRESHOLD = 200
 player_name = ""
 asking_for_name = False
 new_high_score = False
+holes = []  # Lista para armazenar os buracos na pista
+hole_spawn_timer = 0  # Temporizador para spawn de buracos
+oil_stains = []  # Lista para armazenar as manchas de óleo na pista
+oil_stain_spawn_timer = 0  # Temporizador para spawn de manchas de óleo
 
 # --- Callbacks de Input ---
 def key_callback(window, key, scancode, action, mods):
@@ -72,7 +78,7 @@ def key_callback(window, key, scancode, action, mods):
             if len(player_name) < 15:
                 player_name += chr(key)
 
-    # Controles manuais para dificuldade (F1-F7)
+    # Controles manuais para dificuldade (F1-F11)
     if action == glfw.PRESS:
         if key == glfw.KEY_F1:
             difficulty_manager.adjust_scroll_speed_multiplier(0.1)
@@ -89,6 +95,14 @@ def key_callback(window, key, scancode, action, mods):
             difficulty_manager.adjust_enemy_speed_multiplier(-0.1)
         elif key == glfw.KEY_F7:
             difficulty_manager.toggle_manual_control()
+        elif key == glfw.KEY_F8:
+            difficulty_manager.adjust_hole_spawn_probability(0.05)
+        elif key == glfw.KEY_F9:
+            difficulty_manager.adjust_hole_spawn_probability(-0.05)
+        elif key == glfw.KEY_F10:
+            difficulty_manager.adjust_oil_stain_spawn_probability(0.05)
+        elif key == glfw.KEY_F11:
+            difficulty_manager.adjust_oil_stain_spawn_probability(-0.05)
 
 
 def mouse_button_callback(window, button, action, mods):
@@ -193,15 +207,19 @@ def get_hovered_button_game_over_menu(mouse_x, mouse_y):
     return None
 
 def reset_game():
-    global scroll_pos, player_truck, enemies_up, enemies_down, spawn_timer_up, spawn_timer_down, player_name, asking_for_name, new_high_score, police_car
+    global scroll_pos, player_truck, enemies_up, enemies_down, spawn_timer_up, spawn_timer_down, player_name, asking_for_name, new_high_score, police_car,  holes, hole_spawn_timer, oil_stains, oil_stain_spawn_timer
     scroll_pos = 0.0
     player_truck.reset()
     enemies_up.clear()
     enemies_down.clear()
     police_car = None
+    holes.clear()
+    oil_stains.clear()
     spawn_timer_up = 0
-    difficulty_manager.reset()
     spawn_timer_down = 0
+    hole_spawn_timer = 0
+    oil_stain_spawn_timer = 0
+    difficulty_manager.reset()
     player_name = ""
     asking_for_name = False
     new_high_score = False
@@ -253,7 +271,7 @@ def draw_heart(x, y, size=8, color=(1.0, 0.3, 0.3), filled=True):
         glLineWidth(1.0)
 
 def main():
-    global current_game_state, scroll_pos, player_truck, enemies_up, enemies_down, spawn_timer_up, spawn_timer_down, police_car
+    global current_game_state, scroll_pos, player_truck, enemies_up, enemies_down, spawn_timer_up, spawn_timer_down, police_car, holes, hole_spawn_timer, oil_stains, oil_stain_spawn_timer, os, sys, random
 
     if not glfw.init():
         sys.exit("Could not initialize GLFW.")
@@ -273,31 +291,31 @@ def main():
     script_dir = os.path.dirname(os.path.abspath(__file__))
     truck_texture = load_texture(os.path.join(script_dir, "assets/sprite_racing.png"))
     truck_dead_texture = load_texture(os.path.join(script_dir, "assets/sprite_racing_dead.png"))
-    enemy_textures_up = [load_texture(os.path.join(script_dir, f"assets/up_{color}.png")) for color in
-                         ["black", "green", "red", "yellow"]]
-    enemy_textures_down = [load_texture(os.path.join(script_dir, f"assets/down_{color}.png")) for color in
-                           ["black", "green", "red", "yellow"]]
-    enemy_dead_textures_up = [load_texture(os.path.join(script_dir, f"assets/up_{color}_dead.png")) for color in
-                              ["black", "green", "red", "yellow"]]
-    enemy_dead_textures_down = [load_texture(os.path.join(script_dir, f"assets/down_{color}_dead.png")) for color in
-                                ["black", "green", "red", "yellow"]]
+    enemy_textures_up = [load_texture(os.path.join(script_dir, f"assets/up_{color}.png")) for color in ["black", "green", "red", "yellow"]]
+    enemy_textures_down = [load_texture(os.path.join(script_dir, f"assets/down_{color}.png")) for color in ["black", "green", "red", "yellow"]]
+    enemy_dead_textures_up = [load_texture(os.path.join(script_dir, f"assets/up_{color}_dead.png")) for color in ["black", "green", "red", "yellow"]]
+    enemy_dead_textures_down = [load_texture(os.path.join(script_dir, f"assets/down_{color}_dead.png")) for color in ["black", "green", "red", "yellow"]]
+    hole_texture = load_texture(os.path.join(script_dir, "assets/buraco.png"))
+    oil_texture = load_texture(os.path.join(script_dir, "assets/mancha_oleo.png"))
 
-    # Carrega texturas da polícia
     police_textures = {
         'normal_1': load_texture(os.path.join(script_dir, "assets/police_1.png")),
         'normal_2': load_texture(os.path.join(script_dir, "assets/police_2.png")),
         'dead': load_texture(os.path.join(script_dir, "assets/police_dead.png"))
     }
-
-    if not all([truck_texture,
-                truck_dead_texture] + enemy_textures_up + enemy_textures_down + enemy_dead_textures_up + enemy_dead_textures_down + list(
-            police_textures.values())):
+    
+    if not all([truck_texture, truck_dead_texture, hole_texture, oil_texture] + enemy_textures_up + enemy_textures_down + enemy_dead_textures_up + enemy_dead_textures_down + list(police_textures.values())):
         glfw.terminate()
         sys.exit("Failed to load one or more textures.")
 
     player_truck = Truck(truck_texture, truck_dead_texture)
     enemies_up, enemies_down = [], []
+    holes = []
+    oil_stains = []
     spawn_timer_up, spawn_timer_down = 0, 0
+    hole_spawn_timer = 0
+    oil_stain_spawn_timer = 0
+    spawn_rate = 1000
 
     enemy_up_texture_pairs = list(zip(enemy_textures_up, enemy_dead_textures_up))
     enemy_down_texture_pairs = list(zip(enemy_textures_down, enemy_dead_textures_down))
@@ -404,6 +422,91 @@ def main():
                 # inimigos crashados continuam sendo empurrados pelo scroll
                 if enemy.crashed:
                     enemy.y += scroll_speed
+                    
+            # --- Hole Spawning ---
+            hole_spawn_timer += 0.3  # Aumentado para incrementar mais rapidamente o timer
+            hole_spawn_rate = current_spawn_rate * 0.5  # Reduzido drasticamente para buracos aparecerem muito mais frequentemente
+            current_hole_probability = difficulty_manager.get_current_hole_spawn_probability()
+            
+            if hole_spawn_timer >= hole_spawn_rate:
+                hole_spawn_timer = 0
+                # Verificação de probabilidade (com probabilidade garantida a cada X tentativas)
+                # Isso garante que um buraco vai aparecer eventualmente
+                static_spawn_counter = getattr(difficulty_manager, 'hole_spawn_counter', 0) + 1
+                difficulty_manager.hole_spawn_counter = static_spawn_counter
+                
+                # Força o spawn a cada 5 tentativas, independente da probabilidade
+                force_spawn = (static_spawn_counter >= 5)
+                if force_spawn:
+                    difficulty_manager.hole_spawn_counter = 0
+                
+                if force_spawn or random.random() < current_hole_probability:
+                    # Pode aparecer em qualquer faixa
+                    all_lanes = range(0, LANE_COUNT_PER_DIRECTION * 2)
+                    # Relaxamos a restrição de segurança para permitir mais buracos
+                    safe_lanes = [lane for lane in all_lanes if 
+                                 max((h.y for h in holes if h.lane_index == lane), default=0) < SCREEN_HEIGHT - safety_distance/2]
+                    
+                    # Se não houver faixas seguras, usa todas as faixas
+                    if not safe_lanes:
+                        safe_lanes = all_lanes
+                        
+                    chosen_lane = random.choice(safe_lanes)
+                    holes.append(Hole(hole_texture, lane_index=chosen_lane, speed_multiplier=enemy_speed_multiplier))
+            
+            # --- Hole Update & Collision ---
+            for hole in holes:
+                hole.update(scroll_speed)  # Passa a velocidade atual de rolagem
+                if hole.active and player_truck.check_hole_collision(hole):
+                    # Buraco desaparece após uso
+                    hole.active = False
+                    # Aplica efeito de diminuição de velocidade
+                    player_truck.slow_down()
+            
+            # Remove buracos que saíram da tela ou foram usados
+            holes = [h for h in holes if h.active and h.y > -h.height]
+            
+            # --- Oil Stain Spawning ---
+            oil_stain_spawn_timer += 0.3  # Incrementa o timer para spawn
+            oil_stain_spawn_rate = current_spawn_rate * 0.6  # Taxa de spawn um pouco mais lenta que os buracos
+            current_oil_stain_probability = difficulty_manager.get_current_oil_stain_spawn_probability()
+            
+            if oil_stain_spawn_timer >= oil_stain_spawn_rate:
+                oil_stain_spawn_timer = 0
+                # Verificação de probabilidade (com probabilidade garantida a cada X tentativas)
+                static_spawn_counter = getattr(difficulty_manager, 'oil_stain_spawn_counter', 0) + 1
+                difficulty_manager.oil_stain_spawn_counter = static_spawn_counter
+                
+                # Força o spawn a cada 7 tentativas, independente da probabilidade
+                force_spawn = (static_spawn_counter >= 7)
+                if force_spawn:
+                    difficulty_manager.oil_stain_spawn_counter = 0
+                
+                if force_spawn or random.random() < current_oil_stain_probability:
+                    # Pode aparecer em qualquer faixa
+                    all_lanes = range(0, LANE_COUNT_PER_DIRECTION * 2)
+                    # Relaxamos a restrição de segurança para permitir mais manchas
+                    safe_lanes = [lane for lane in all_lanes if 
+                                 max((o.y for o in oil_stains if o.lane_index == lane), default=0) < SCREEN_HEIGHT - safety_distance/2]
+                    
+                    # Se não houver faixas seguras, usa todas as faixas
+                    if not safe_lanes:
+                        safe_lanes = all_lanes
+                        
+                    chosen_lane = random.choice(safe_lanes)
+                    oil_stains.append(OilStain(oil_texture, lane_index=chosen_lane, speed_multiplier=enemy_speed_multiplier))
+            
+            # --- Oil Stain Update & Collision ---
+            for oil_stain in oil_stains:
+                oil_stain.update(scroll_speed)  # Passa a velocidade atual de rolagem
+                if oil_stain.active and player_truck.check_oil_stain_collision(oil_stain):
+                    # Mancha desaparece após uso
+                    oil_stain.active = False
+                    # Aplica efeito de inversão de controles
+                    player_truck.invert_controls()
+            
+            # Remove manchas que saíram da tela ou foram usadas
+            oil_stains = [o for o in oil_stains if o.active and o.y > -o.height]
 
             # Propagação de colisão: inimigos crashados podem colidir com outros
             def _rects_overlap(a, b):
@@ -471,6 +574,15 @@ def main():
             glLoadIdentity()
 
             draw_road(scroll_pos)
+            
+            # Desenha os buracos e manchas primeiro (para ficarem "abaixo" dos carros)
+            for hole in holes:
+                hole.draw()
+                
+            # Desenha as manchas de óleo
+            for oil_stain in oil_stains:
+                oil_stain.draw()
+                
             player_truck.draw()
             for enemy in enemies_up:
                 enemy.draw()
@@ -492,12 +604,20 @@ def main():
             # Painel lateral - fundo
             draw_rect(0, 0, PANEL_WIDTH, SCREEN_HEIGHT, COLOR_PANEL)
             time_elapsed = glfw.get_time()
-            speed = abs(scroll_speed * 400)
+            
+            # Calcula a velocidade considerando o efeito do buraco com transição suave
+            base_speed = abs(scroll_speed * 400)
+            if player_truck.slowed_down:
+                # Usa o fator de velocidade atual que muda gradualmente
+                displayed_speed = base_speed * player_truck.current_speed_factor
+            else:
+                displayed_speed = base_speed
+            
             score = abs(scroll_pos * 0.1)
 
             # Top stats
             draw_text(f"Time: {int(time_elapsed)}", 12, SCREEN_HEIGHT - 28)
-            draw_text(f"Speed: {speed:.0f} km/h", 12, SCREEN_HEIGHT - 52)
+            draw_text(f"Speed: {displayed_speed:.0f} km/h", 12, SCREEN_HEIGHT - 52)
             draw_text(f"Score: {int(score)}", 12, SCREEN_HEIGHT - 76)
             
             # Exibe as vidas usando corações desenhados geometricamente
@@ -531,11 +651,13 @@ def main():
             ss = difficulty_info['scroll_speed_multiplier']
             sr = difficulty_info['spawn_rate_multiplier']
             es = difficulty_info['enemy_speed_multiplier']
+            hs = difficulty_info['hole_spawn_probability']
 
             # Normalização usando limites do DifficultyManager (seguro se atributos existirem)
             max_ss = getattr(difficulty_manager, 'max_scroll_speed_multiplier', 3.0)
             min_sr = getattr(difficulty_manager, 'min_spawn_rate_multiplier', 0.3)
             max_es = getattr(difficulty_manager, 'max_enemy_speed_multiplier', 2.5)
+            max_hs = getattr(difficulty_manager, 'max_hole_spawn_probability', 0.5)
 
             # Normalização dos valores
             def clamp01(v):
@@ -544,6 +666,7 @@ def main():
             ss_norm = clamp01((ss - 1.0) / max(0.0001, (max_ss - 1.0)))
             sr_norm = clamp01((1.0 - sr) / max(0.0001, (1.0 - min_sr)))  # menor spawn_rate => maior frequência
             es_norm = clamp01((es - 1.0) / max(0.0001, (max_es - 1.0)))
+            hs_norm = clamp01(hs / max_hs)
 
             # Difficulty values (labels with numeric values below) — adjusted for clarity
             label_x = 14
@@ -565,6 +688,19 @@ def main():
             # Enemy Speed
             draw_text("Enemy (F5 / F6)", label_x, y0)
             draw_text(f"x{es:.2f}", label_x, y0 - line_height)
+            y0 -= group_spacing
+            
+            # Hole Spawn Probability
+            draw_text("Buracos (F8 / F9)", label_x, y0)
+            draw_text(f"{hs:.2f} prob.", label_x, y0 - line_height)
+            y0 -= group_spacing
+            
+            # Oil Stain Spawn Probability
+            os = difficulty_info.get("oil_stain_spawn_probability", 0.0)
+            max_os = difficulty_manager.max_oil_stain_spawn_probability
+            os_norm = clamp01(os / max_os)
+            draw_text("Óleo (F10 / F11)", label_x, y0)
+            draw_text(f"{os:.2f} prob.", label_x, y0 - line_height)
             y0 -= group_spacing
 
             # Mode / ajuda de teclas

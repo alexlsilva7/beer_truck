@@ -7,21 +7,34 @@ class DifficultyManager:
         self.base_scroll_speed = 0.18
         self.base_spawn_rate = 1000
         self.base_enemy_speed = 1.0
+        self.base_hole_spawn_probability = 0.5  # 50% de chance (aumentado ainda mais)
+        self.base_oil_stain_spawn_probability = 0.3  # 30% de chance inicial
 
         # Multiplicadores atuais (iniciam em 1.0 = 100%)
         self.scroll_speed_multiplier = 1.0
         self.spawn_rate_multiplier = 1.0
         self.enemy_speed_multiplier = 1.0
+        self.hole_spawn_probability = self.base_hole_spawn_probability
+        self.oil_stain_spawn_probability = self.base_oil_stain_spawn_probability
+        
+        # Contador para forçar a criação de buracos
+        self.hole_spawn_counter = 0
+        # Contador para forçar a criação de manchas de óleo
+        self.oil_stain_spawn_counter = 0
 
         # Taxas de aumento por segundo
         self.scroll_speed_increase_rate = 0.002
         self.spawn_rate_decrease_rate = 0.011
         self.enemy_speed_increase_rate = 0.004
+        self.hole_spawn_increase_rate = 0.0005  # Aumento gradual da chance de buracos
+        self.oil_stain_spawn_increase_rate = 0.0003  # Aumento gradual da chance de manchas de óleo
 
         # Limites máximos para evitar valores extremos
         self.max_scroll_speed_multiplier = 2.0
         self.min_spawn_rate_multiplier = 0.20
         self.max_enemy_speed_multiplier = 2.5
+        self.max_hole_spawn_probability = 0.5  # Máximo de 50% de chance
+        self.max_oil_stain_spawn_probability = 0.4  # Máximo de 40% de chance
 
         # Controles para ajustes manuais
         self.manual_control_enabled = False
@@ -57,6 +70,18 @@ class DifficultyManager:
                 self.enemy_speed_multiplier + (self.enemy_speed_increase_rate * delta_time),
                 self.max_enemy_speed_multiplier
             )
+            
+            # Atualiza a probabilidade de spawn de buracos
+            self.hole_spawn_probability = min(
+                self.hole_spawn_probability + (self.hole_spawn_increase_rate * delta_time),
+                self.max_hole_spawn_probability
+            )
+            
+            # Atualiza a probabilidade de spawn de manchas de óleo
+            self.oil_stain_spawn_probability = min(
+                self.oil_stain_spawn_probability + (self.oil_stain_spawn_increase_rate * delta_time),
+                self.max_oil_stain_spawn_probability
+            )
 
     def get_current_scroll_speed(self):
         """Retorna a velocidade de rolagem atual"""
@@ -69,6 +94,14 @@ class DifficultyManager:
     def get_current_enemy_speed_multiplier(self):
         """Retorna o multiplicador de velocidade dos inimigos"""
         return self.enemy_speed_multiplier
+    
+    def get_current_hole_spawn_probability(self):
+        """Retorna a probabilidade atual de spawn de buracos"""
+        return self.hole_spawn_probability
+        
+    def get_current_oil_stain_spawn_probability(self):
+        """Retorna a probabilidade atual de spawn de manchas de óleo"""
+        return self.oil_stain_spawn_probability
 
     def adjust_scroll_speed_multiplier(self, delta):
         """Ajusta manualmente o multiplicador de velocidade de rolagem"""
@@ -93,12 +126,32 @@ class DifficultyManager:
                 self.enemy_speed_multiplier + delta,
                 self.max_enemy_speed_multiplier
             ))
+            
+    def adjust_hole_spawn_probability(self, delta):
+        """Ajusta manualmente a probabilidade de spawn de buracos"""
+        if self.manual_control_enabled:
+            self.hole_spawn_probability = max(0.0, min(
+                self.hole_spawn_probability + delta,
+                self.max_hole_spawn_probability
+            ))
+            
+    def adjust_oil_stain_spawn_probability(self, delta):
+        """Ajusta manualmente a probabilidade de spawn de manchas de óleo"""
+        if self.manual_control_enabled:
+            self.oil_stain_spawn_probability = max(0.0, min(
+                self.oil_stain_spawn_probability + delta,
+                self.max_oil_stain_spawn_probability
+            ))
 
     def reset(self):
         """Reseta todos os multiplicadores para os valores iniciais"""
         self.scroll_speed_multiplier = 1.0
         self.spawn_rate_multiplier = 1.0
         self.enemy_speed_multiplier = 1.0
+        self.hole_spawn_probability = self.base_hole_spawn_probability
+        self.oil_stain_spawn_probability = self.base_oil_stain_spawn_probability
+        self.hole_spawn_counter = 0
+        self.oil_stain_spawn_counter = 0
         self.last_update_time = 0
 
     def toggle_manual_control(self):
@@ -111,6 +164,8 @@ class DifficultyManager:
             "scroll_speed_multiplier": self.scroll_speed_multiplier,
             "spawn_rate_multiplier": self.spawn_rate_multiplier,
             "enemy_speed_multiplier": self.enemy_speed_multiplier,
+            "hole_spawn_probability": self.hole_spawn_probability,
+            "oil_stain_spawn_probability": self.oil_stain_spawn_probability,
             "current_scroll_speed": self.get_current_scroll_speed(),
             "current_spawn_rate": self.get_current_spawn_rate(),
             "manual_control": self.manual_control_enabled
