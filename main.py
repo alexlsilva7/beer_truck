@@ -308,19 +308,19 @@ def main():
 
     # --- Load Textures ---
     script_dir = os.path.dirname(os.path.abspath(__file__))
-    truck_texture = load_texture(os.path.join(script_dir, "assets/sprite_racing.png"))
-    truck_dead_texture = load_texture(os.path.join(script_dir, "assets/sprite_racing_dead.png"))
-    enemy_textures_up = [load_texture(os.path.join(script_dir, f"assets/up_{color}.png")) for color in ["black", "green", "red", "yellow"]]
-    enemy_textures_down = [load_texture(os.path.join(script_dir, f"assets/down_{color}.png")) for color in ["black", "green", "red", "yellow"]]
-    enemy_dead_textures_up = [load_texture(os.path.join(script_dir, f"assets/up_{color}_dead.png")) for color in ["black", "green", "red", "yellow"]]
-    enemy_dead_textures_down = [load_texture(os.path.join(script_dir, f"assets/down_{color}_dead.png")) for color in ["black", "green", "red", "yellow"]]
-    hole_texture = load_texture(os.path.join(script_dir, "assets/buraco.png"))
-    oil_texture = load_texture(os.path.join(script_dir, "assets/mancha_oleo.png"))
+    truck_texture = load_texture(os.path.join(script_dir, "assets/veiculos/protagonista/sprite_racing.png"))
+    truck_dead_texture = load_texture(os.path.join(script_dir, "assets/veiculos/protagonista/sprite_racing_dead.png"))
+    enemy_textures_up = [load_texture(os.path.join(script_dir, f"assets/veiculos/up_{color}.png")) for color in ["black", "green", "red", "yellow"]]
+    enemy_textures_down = [load_texture(os.path.join(script_dir, f"assets/veiculos/down_{color}.png")) for color in ["black", "green", "red", "yellow"]]
+    enemy_dead_textures_up = [load_texture(os.path.join(script_dir, f"assets/veiculos/up_{color}_dead.png")) for color in ["black", "green", "red", "yellow"]]
+    enemy_dead_textures_down = [load_texture(os.path.join(script_dir, f"assets/veiculos/down_{color}_dead.png")) for color in ["black", "green", "red", "yellow"]]
+    hole_texture = load_texture(os.path.join(script_dir, "assets/elementos_de_cenario/buraco.png"))
+    oil_texture = load_texture(os.path.join(script_dir, "assets/elementos_de_cenario/mancha_oleo.png"))
 
     police_textures = {
-        'normal_1': load_texture(os.path.join(script_dir, "assets/police_1.png")),
-        'normal_2': load_texture(os.path.join(script_dir, "assets/police_2.png")),
-        'dead': load_texture(os.path.join(script_dir, "assets/police_dead.png"))
+        'normal_1': load_texture(os.path.join(script_dir, "assets/veiculos/police_1.png")),
+        'normal_2': load_texture(os.path.join(script_dir, "assets/veiculos/police_2.png")),
+        'dead': load_texture(os.path.join(script_dir, "assets/veiculos/police_dead.png"))
     }
     
     try:
