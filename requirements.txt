@@ -3,3 +3,4 @@ PyOpenGL==3.1.10
 PyGLFW==0.2.2
 Pillow==11.3.0
 numpy==2.3.2
+pygame==2.6.1

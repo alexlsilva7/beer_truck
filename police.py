@@ -2,13 +2,22 @@
 from OpenGL.GL import *
 from road import SCREEN_HEIGHT, ROAD_WIDTH, GAME_WIDTH
 import random
+import threading
+import audio_manager
 
+def preload_police_sound(path, create_loop=True):
+    return audio_manager.preload_sound(path, create_loop=create_loop)
+
+def get_preloaded_police_sounds(path):
+    return audio_manager.get_preloaded_sounds(path)
 
 class PoliceCar:
-    def __init__(self, textures):
+    def __init__(self, textures, sound_path=None, sound_loop=True):
         """
         Inicializa o carro da polícia.
         textures: Dicionário com 'normal_1', 'normal_2', 'dead'.
+        sound_path: caminho para o arquivo WAV.
+        sound_loop: se True, reproduz a versão de loop após o segmento inicial.
         """
         self.textures = textures
         self.current_texture_id = self.textures['normal_1']
@@ -16,19 +25,31 @@ class PoliceCar:
         self.width = 50
         self.height = 100
 
-        # Inicia fora da tela, na parte de baixo
+        # Inicia fora da tela
         road_x_start = (GAME_WIDTH - ROAD_WIDTH) / 2
         road_x_end = road_x_start + ROAD_WIDTH - self.width
         self.x = random.uniform(road_x_start, road_x_end)
         self.y = -self.height
 
-        self.speed_y = 0.12  # Velocidade vertical para alcançar o jogador
-        self.chase_speed_x = 0.08  # Suavidade do movimento horizontal
+        self.speed_y = 0.12
+        self.chase_speed_x = 0.08
         self.crashed = False
 
-        # Controle de animação das luzes
+        # Animação
         self.animation_timer = 0
-        self.animation_speed = 100  # Troca de frame a cada 15 updates
+        self.animation_speed = 100
+
+        # Áudio
+        self.sound_path = sound_path
+        self._player = None
+        self._player_lock = threading.Lock()
+
+        if self.sound_path:
+            try:
+                self._player = audio_manager.SoundPlayer(self.sound_path, use_loop=sound_loop)
+                self._player.start()
+            except Exception as e:
+                print(f"Failed to start police sound: {e}")
 
     def draw(self):
         """Desenha o carro da polícia na tela."""
@@ -36,18 +57,17 @@ class PoliceCar:
         glEnable(GL_BLEND)
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
 
-        # Usa a textura de destruído se colidiu
         current_texture = self.textures['dead'] if self.crashed else self.current_texture_id
         glBindTexture(GL_TEXTURE_2D, current_texture)
 
         glBegin(GL_QUADS)
-        glTexCoord2f(0, 1);
+        glTexCoord2f(0, 1)
         glVertex2f(self.x, self.y)
-        glTexCoord2f(1, 1);
+        glTexCoord2f(1, 1)
         glVertex2f(self.x + self.width, self.y)
-        glTexCoord2f(1, 0);
+        glTexCoord2f(1, 0)
         glVertex2f(self.x + self.width, self.y + self.height)
-        glTexCoord2f(0, 0);
+        glTexCoord2f(0, 0)
         glVertex2f(self.x, self.y + self.height)
         glEnd()
 
@@ -55,7 +75,6 @@ class PoliceCar:
         glDisable(GL_BLEND)
 
     def _animate(self):
-        """Alterna entre as texturas para criar o efeito de luzes piscando."""
         self.animation_timer += 1
         if self.animation_timer > self.animation_speed:
             self.animation_timer = 0
@@ -64,55 +83,64 @@ class PoliceCar:
             else:
                 self.current_texture_id = self.textures['normal_1']
 
+    def _is_playing(self):
+        try:
+            if not self._player:
+                return False
+            return self._player.is_playing()
+        except Exception:
+            return False
+
+    def _start_player(self):
+        try:
+            if self._player and not self._player.is_playing():
+                self._player.start()
+        except Exception:
+            pass
+
+    def stop_audio(self):
+        """Para a reprodução do som associado (se houver)."""
+        try:
+            if self._player:
+                self._player.stop()
+        except Exception:
+            pass
+        finally:
+            self._player = None
+
     def _check_rear_end_collision(self, target):
-        """Verifica colisão traseira. A polícia só bate por trás."""
-
-        # 1. Verifica se estão na mesma "coluna" horizontal
         is_horizontally_aligned = (self.x < target.x + target.width and self.x + self.width > target.x)
-
-        # 2. Verifica se a frente da polícia está prestes a tocar ou já tocou a traseira do alvo
         is_vertically_close = (self.y + self.height >= target.y and self.y < target.y)
-
         return is_horizontally_aligned and is_vertically_close
 
     def update(self, player_truck, all_enemies, scroll_speed):
-        """Atualiza a posição e o estado do carro da polícia."""
         if self.crashed:
-            # Se colidiu, é empurrado para fora da tela pelo scroll
+            try:
+                self.stop_audio()
+            except Exception:
+                pass
             self.y += scroll_speed
             return
 
         self._animate()
 
-        # --- Lógica de Perseguição ---
-        # 1. Movimento vertical constante para cima
+        # Movimento vertical e perseguição horizontal
         self.y += self.speed_y
-
-        # 2. Persegue o jogador no eixo X de forma suave
         target_x = player_truck.x
-        # Interpola suavemente a posição X atual em direção ao alvo
         self.x += (target_x - self.x) * self.chase_speed_x
 
-        # Mantém o carro dentro dos limites da pista
         road_x_start = (GAME_WIDTH - ROAD_WIDTH) / 2
         min_x = road_x_start
         max_x = road_x_start + ROAD_WIDTH - self.width
         if self.x < min_x: self.x = min_x
         if self.x > max_x: self.x = max_x
 
-        # --- Lógica de Colisão ---
-        # A polícia pode colidir com o jogador ou com outros carros
         potential_targets = all_enemies + [player_truck]
-
         for target in potential_targets:
             if target.crashed:
                 continue
-
             if self._check_rear_end_collision(target):
-                # Marca o alvo como colidido
                 target.crashed = True
-                # Se o alvo for o jogador, a polícia também "morre" na colisão
                 if target is player_truck:
                     self.crashed = True
-                # Para de verificar outras colisões neste frame para evitar colisões múltiplas
                 break

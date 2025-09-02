@@ -6,18 +6,20 @@ from OpenGL.GLUT import GLUT_BITMAP_HELVETICA_18  # Importação explícita para
 import sys
 import os
 import random
+import time
 
 from road import draw_road, SCREEN_WIDTH, SCREEN_HEIGHT, GAME_WIDTH, PANEL_WIDTH, COLOR_PANEL, draw_rect, PLAYER_SPEED, \
     ROAD_WIDTH, LANE_COUNT_PER_DIRECTION, LANE_WIDTH
 from truck import Truck
 from enemy import Enemy, EnemyDown
-from police import PoliceCar
+import police
 from hole import Hole
 from oil_stain import OilStain
 from texture_loader import load_texture
 from menu import MenuState, draw_start_menu, draw_instructions_screen, draw_game_over_menu, draw_name_input_screen, draw_lives
 from difficulty_manager import DifficultyManager
 from high_score_manager import HighScoreManager
+import audio_manager
 
 # --- Estados do Jogo ---
 GAME_STATE_MENU = 0
@@ -35,7 +37,12 @@ menu_state = MenuState()
 police_car = None  # Variável para controlar o carro da polícia
 
 # --- Constantes da Polícia ---
-POLICE_SPAWN_SCORE_THRESHOLD = 200
+POLICE_SPAWN_SCORE_THRESHOLD = 500
+POLICE_COOLDOWN_SECONDS = 10  # Tempo mínimo entre dois spawns de polícia (segundos)
+last_police_spawn_time = -9999.0  # Guarda o tempo do último spawn (usamos glfw.get_time())
+
+# --- Constantes da Polícia ---
+POLICE_SPAWN_SCORE_THRESHOLD = 500
 
 player_name = ""
 asking_for_name = False
@@ -207,12 +214,24 @@ def get_hovered_button_game_over_menu(mouse_x, mouse_y):
     return None
 
 def reset_game():
-    global scroll_pos, player_truck, enemies_up, enemies_down, spawn_timer_up, spawn_timer_down, player_name, asking_for_name, new_high_score, police_car,  holes, hole_spawn_timer, oil_stains, oil_stain_spawn_timer
+    global scroll_pos, player_truck, enemies_up, enemies_down, spawn_timer_up, spawn_timer_down, player_name, asking_for_name, new_high_score, police_car,  holes, hole_spawn_timer, oil_stains, oil_stain_spawn_timer, last_police_spawn_time
     scroll_pos = 0.0
     player_truck.reset()
     enemies_up.clear()
     enemies_down.clear()
+    if police_car:
+        try:
+            police_car.stop_audio()
+        except Exception:
+            pass
+    # Garantir que todos os players globais de áudio sejam interrompidos
+    try:
+        audio_manager.stop_all()
+    except Exception:
+        pass
     police_car = None
+    # Reset do timer de spawn da polícia
+    last_police_spawn_time = -9999.0
     holes.clear()
     oil_stains.clear()
     spawn_timer_up = 0
@@ -271,7 +290,7 @@ def draw_heart(x, y, size=8, color=(1.0, 0.3, 0.3), filled=True):
         glLineWidth(1.0)
 
 def main():
-    global current_game_state, scroll_pos, player_truck, enemies_up, enemies_down, spawn_timer_up, spawn_timer_down, police_car, holes, hole_spawn_timer, oil_stains, oil_stain_spawn_timer, os, sys, random
+    global current_game_state, scroll_pos, player_truck, enemies_up, enemies_down, spawn_timer_up, spawn_timer_down, police_car, holes, hole_spawn_timer, oil_stains, oil_stain_spawn_timer, sys, random, last_police_spawn_time
 
     if not glfw.init():
         sys.exit("Could not initialize GLFW.")
@@ -303,6 +322,11 @@ def main():
         'normal_2': load_texture(os.path.join(script_dir, "assets/police_2.png")),
         'dead': load_texture(os.path.join(script_dir, "assets/police_dead.png"))
     }
+    
+    try:
+        audio_manager.preload_sound(os.path.join(script_dir, "assets/sound/police_sound.wav"), create_loop=True)
+    except Exception:
+        pass
     
     if not all([truck_texture, truck_dead_texture, hole_texture, oil_texture] + enemy_textures_up + enemy_textures_down + enemy_dead_textures_up + enemy_dead_textures_down + list(police_textures.values())):
         glfw.terminate()
@@ -373,18 +397,37 @@ def main():
 
             # --- Police Spawning ---
             if police_car is None and score > POLICE_SPAWN_SCORE_THRESHOLD:
-                # A chance aumenta com a pontuação
-                spawn_chance = random.uniform(0, 1) * (score / 5000000.0)
-                print(f"Police spawn chance: {spawn_chance:.4f}")
-                if random.random() < spawn_chance:
-                    print(f"Police car spawned at score {score:.0f}!")
-                    police_car = PoliceCar(police_textures)
+                # Respeita cooldown entre spawns de polícia
+                current_time = glfw.get_time()
+                time_since_last = current_time - last_police_spawn_time
+                if time_since_last < POLICE_COOLDOWN_SECONDS:
+                    # Ainda em cooldown — não tenta spawnar
+                    pass
+                else:
+                    # A chance aumenta com a pontuação
+                    spawn_chance = random.uniform(0, 1) * (score / 500000.0)
+                    if random.random() < spawn_chance:
+                        print(f"Police spawn chance: {spawn_chance:.4f}")
+                        print(f"Police car spawned at score {score:.0f}!")
+                        # Medir tempo de inicialização para diagnosticar travamentos ao spawn
+                        try:
+                            police_car = police.PoliceCar(police_textures, os.path.join(script_dir, "assets/sound/police_sound.wav"))
+                            # Registra o tempo do spawn para aplicar cooldown
+                            last_police_spawn_time = glfw.get_time()
+                        except Exception as e:
+                            print(f"Failed to spawn PoliceCar: {e}")
 
             # --- Police Update ---
             if police_car:
                 police_car.update(player_truck, enemies_up + enemies_down, scroll_speed)
                 # Se a polícia sair da tela por cima ou por baixo, remove-a
                 if police_car.y > SCREEN_HEIGHT or police_car.y + police_car.height < 0:
+                    try:
+                        police_car.stop_audio()
+                    except Exception:
+                        pass
+                    # Guarda momento de remoção para iniciar cooldown
+                    last_police_spawn_time = glfw.get_time()
                     police_car = None
 
             # --- Enemy Spawning ---
@@ -626,7 +669,6 @@ def main():
             for i in range(player_truck.lives):
                 if player_truck.invulnerable:
                     # Pisca durante invulnerabilidade
-                    import time
                     blink = int(time.time() * 6) % 2
                     if blink:
                         color = (1.0, 1.0, 0.3)  # Amarelo
@@ -696,11 +738,11 @@ def main():
             y0 -= group_spacing
             
             # Oil Stain Spawn Probability
-            os = difficulty_info.get("oil_stain_spawn_probability", 0.0)
+            oil_prob = difficulty_info.get("oil_stain_spawn_probability", 0.0)
             max_os = difficulty_manager.max_oil_stain_spawn_probability
-            os_norm = clamp01(os / max_os)
+            os_norm = clamp01(oil_prob / max_os)
             draw_text("Óleo (F10 / F11)", label_x, y0)
-            draw_text(f"{os:.2f} prob.", label_x, y0 - line_height)
+            draw_text(f"{oil_prob:.2f} prob.", label_x, y0 - line_height)
             y0 -= group_spacing
 
             # Mode / ajuda de teclas
