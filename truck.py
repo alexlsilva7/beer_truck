@@ -4,10 +4,11 @@ import time
 
 
 class Truck:
-    def __init__(self, texture_id, dead_texture_id=None):
+    def __init__(self, texture_id, dead_texture_id=None, armored_texture_id=None):
         """Inicializa as propriedades do caminhão."""
         self.texture_id = texture_id
         self.dead_texture_id = dead_texture_id
+        self.armored_texture_id = armored_texture_id  # Textura do carro blindado
         self.width = 50
         self.height = 100
         self.x = (GAME_WIDTH - self.width) / 2
@@ -18,7 +19,8 @@ class Truck:
         self.lives = 3
         self.invulnerable = False
         self.invulnerable_start_time = 0 
-        self.invulnerable_duration = 2.0
+        self.invulnerable_duration = 4.0  # Aumentado de 2.0 para 4.0 segundos
+        self.armored = False  # Estado de invulnerabilidade do power-up
         # Novas propriedades para efeito do buraco
         self.slowed_down = False
         self.slow_down_start_time = 0
@@ -39,6 +41,7 @@ class Truck:
         if self.invulnerable:
             if current_time - self.invulnerable_start_time >= self.invulnerable_duration:
                 self.invulnerable = False
+                self.armored = False  # Remove o estado blindado quando a invulnerabilidade acaba
                 
         # Verifica efeito de diminuição de velocidade
         if self.slowed_down:
@@ -63,11 +66,22 @@ class Truck:
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
 
         # Usa textura "dead" se o caminhão colidiu e tem textura dead
-        current_texture = self.dead_texture_id if self.crashed and self.dead_texture_id else self.texture_id
+        # Usa textura "armored" se está blindado
+        if self.crashed and self.dead_texture_id:
+            current_texture = self.dead_texture_id
+        elif self.armored and self.armored_texture_id:
+            current_texture = self.armored_texture_id
+        else:
+            current_texture = self.texture_id
         glBindTexture(GL_TEXTURE_2D, current_texture)
 
         # Efeito visual baseado no estado do caminhão
-        if self.invulnerable:
+        if self.invulnerable and self.armored:
+            # Efeito dourado para o carro blindado
+            blink_speed = 4
+            gold_intensity = 0.7 + 0.3 * abs((time.time() * blink_speed) % 2 - 1)
+            glColor4f(1.0, gold_intensity, 0.3, 1.0)
+        elif self.invulnerable:
             # Calcula a transparência baseada no tempo para criar efeito de piscar
             blink_speed = 6  # Velocidade do piscar
             alpha = 0.3 + 0.7 * abs((time.time() * blink_speed) % 2 - 1)
@@ -127,10 +141,7 @@ class Truck:
 
     def check_collision(self, other):
         """Verifica a colisão com outro objeto (inimigo)."""
-        # Não verifica colisão se estiver invulnerável
-        if self.invulnerable:
-            return False
-            
+        # Sempre verifica a colisão - a proteção contra dano é tratada em outro lugar
         return (self.x < other.x + other.width and
                 self.x + self.width > other.x and
                 self.y < other.y + other.height and
@@ -174,6 +185,25 @@ class Truck:
         
         return (abs(truck_center_x - oil_center_x) < max_x_distance and
                 abs(truck_center_y - oil_center_y) < max_y_distance)
+                
+    def check_invulnerability_powerup_collision(self, powerup):
+        """Verifica a colisão com um power-up de invulnerabilidade."""
+        if not powerup.active or self.crashed:
+            return False
+        
+        # Usando um sistema de colisão baseado no centro e com área ajustada
+        truck_center_x = self.x + self.width / 2
+        truck_center_y = self.y + self.height / 2
+        
+        powerup_center_x = powerup.x + powerup.width / 2
+        powerup_center_y = powerup.y + powerup.height / 2
+        
+        # Distância máxima para considerar colisão
+        max_x_distance = (self.width + powerup.width) / 3
+        max_y_distance = (self.height + powerup.height) / 3
+        
+        return (abs(truck_center_x - powerup_center_x) < max_x_distance and
+                abs(truck_center_y - powerup_center_y) < max_y_distance)
 
     def take_damage(self):
         """O caminhão perde uma vida e fica temporariamente invulnerável."""
@@ -205,6 +235,13 @@ class Truck:
             self.controls_inverted_start_time = time.time()
             return True  # Indica que o efeito foi aplicado
         return False  # Já estava com controles invertidos
+        
+    def activate_invulnerability_powerup(self):
+        """Ativa o power-up de invulnerabilidade, transformando em carro blindado."""
+        self.invulnerable = True
+        self.armored = True
+        self.invulnerable_start_time = time.time()
+        return True  # Indica que o power-up foi aplicado
 
     def reset(self):
         """Reseta o caminhão para a posição inicial."""
@@ -214,6 +251,7 @@ class Truck:
         self.lives = 3
         self.invulnerable = False
         self.invulnerable_start_time = 0
+        self.armored = False
         self.slowed_down = False
         self.slow_down_start_time = 0
         self.current_speed_factor = 1.0
