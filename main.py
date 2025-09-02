@@ -15,6 +15,7 @@ from enemy import Enemy, EnemyDown
 import police
 from hole import Hole
 from oil_stain import OilStain
+from invulnerability import InvulnerabilityPowerUp
 from texture_loader import load_texture
 from menu import MenuState, draw_start_menu, draw_instructions_screen, draw_game_over_menu, draw_name_input_screen, draw_lives
 from difficulty_manager import DifficultyManager
@@ -51,6 +52,8 @@ holes = []  # Lista para armazenar os buracos na pista
 hole_spawn_timer = 0  # Temporizador para spawn de buracos
 oil_stains = []  # Lista para armazenar as manchas de óleo na pista
 oil_stain_spawn_timer = 0  # Temporizador para spawn de manchas de óleo
+invulnerability_powerups = []  # Lista para armazenar os power-ups de invulnerabilidade
+invulnerability_spawn_timer = 0  # Temporizador para spawn de power-ups
 
 # --- Callbacks de Input ---
 def key_callback(window, key, scancode, action, mods):
@@ -110,6 +113,10 @@ def key_callback(window, key, scancode, action, mods):
             difficulty_manager.adjust_oil_stain_spawn_probability(0.05)
         elif key == glfw.KEY_F11:
             difficulty_manager.adjust_oil_stain_spawn_probability(-0.05)
+        elif key == glfw.KEY_F12:
+            difficulty_manager.adjust_invulnerability_spawn_probability(0.02)
+        elif key == glfw.KEY_INSERT:
+            difficulty_manager.adjust_invulnerability_spawn_probability(-0.02)
 
 
 def mouse_button_callback(window, button, action, mods):
@@ -214,7 +221,7 @@ def get_hovered_button_game_over_menu(mouse_x, mouse_y):
     return None
 
 def reset_game():
-    global scroll_pos, player_truck, enemies_up, enemies_down, spawn_timer_up, spawn_timer_down, player_name, asking_for_name, new_high_score, police_car,  holes, hole_spawn_timer, oil_stains, oil_stain_spawn_timer, last_police_spawn_time
+    global scroll_pos, player_truck, enemies_up, enemies_down, spawn_timer_up, spawn_timer_down, player_name, asking_for_name, new_high_score, police_car,  holes, hole_spawn_timer, oil_stains, oil_stain_spawn_timer, invulnerability_powerups, invulnerability_spawn_timer, last_police_spawn_time
     scroll_pos = 0.0
     player_truck.reset()
     enemies_up.clear()
@@ -234,10 +241,12 @@ def reset_game():
     last_police_spawn_time = -9999.0
     holes.clear()
     oil_stains.clear()
+    invulnerability_powerups.clear()
     spawn_timer_up = 0
     spawn_timer_down = 0
     hole_spawn_timer = 0
     oil_stain_spawn_timer = 0
+    invulnerability_spawn_timer = 0
     difficulty_manager.reset()
     player_name = ""
     asking_for_name = False
@@ -290,7 +299,7 @@ def draw_heart(x, y, size=8, color=(1.0, 0.3, 0.3), filled=True):
         glLineWidth(1.0)
 
 def main():
-    global current_game_state, scroll_pos, player_truck, enemies_up, enemies_down, spawn_timer_up, spawn_timer_down, police_car, holes, hole_spawn_timer, oil_stains, oil_stain_spawn_timer, sys, random, last_police_spawn_time
+    global current_game_state, scroll_pos, player_truck, enemies_up, enemies_down, spawn_timer_up, spawn_timer_down, police_car, holes, hole_spawn_timer, oil_stains, oil_stain_spawn_timer, invulnerability_powerups, invulnerability_spawn_timer, sys, random, last_police_spawn_time
 
     if not glfw.init():
         sys.exit("Could not initialize GLFW.")
@@ -308,19 +317,21 @@ def main():
 
     # --- Load Textures ---
     script_dir = os.path.dirname(os.path.abspath(__file__))
-    truck_texture = load_texture(os.path.join(script_dir, "assets/truck.png"))
-    truck_dead_texture = load_texture(os.path.join(script_dir, "assets/truck_dead.png"))
-    enemy_textures_up = [load_texture(os.path.join(script_dir, f"assets/up_{color}.png")) for color in ["black", "green", "red", "yellow"]]
-    enemy_textures_down = [load_texture(os.path.join(script_dir, f"assets/down_{color}.png")) for color in ["black", "green", "red", "yellow"]]
-    enemy_dead_textures_up = [load_texture(os.path.join(script_dir, f"assets/up_{color}_dead.png")) for color in ["black", "green", "red", "yellow"]]
-    enemy_dead_textures_down = [load_texture(os.path.join(script_dir, f"assets/down_{color}_dead.png")) for color in ["black", "green", "red", "yellow"]]
-    hole_texture = load_texture(os.path.join(script_dir, "assets/buraco.png"))
-    oil_texture = load_texture(os.path.join(script_dir, "assets/mancha_oleo.png"))
+    truck_texture = load_texture(os.path.join(script_dir, "assets/veiculos/protagonista/truck.png"))
+    truck_dead_texture = load_texture(os.path.join(script_dir, "assets/veiculos/protagonista/truck_dead.png"))
+    truck_armored_texture = load_texture(os.path.join(script_dir, "assets/veiculos/protagonista/carro blindado.png"))
+    enemy_textures_up = [load_texture(os.path.join(script_dir, f"assets/veiculos/up_{color}.png")) for color in ["black", "green", "red", "yellow"]]
+    enemy_textures_down = [load_texture(os.path.join(script_dir, f"assets/veiculos/down_{color}.png")) for color in ["black", "green", "red", "yellow"]]
+    enemy_dead_textures_up = [load_texture(os.path.join(script_dir, f"assets/veiculos/up_{color}_dead.png")) for color in ["black", "green", "red", "yellow"]]
+    enemy_dead_textures_down = [load_texture(os.path.join(script_dir, f"assets/veiculos/down_{color}_dead.png")) for color in ["black", "green", "red", "yellow"]]
+    hole_texture = load_texture(os.path.join(script_dir, "assets/elementos_de_cenario/buraco.png"))
+    oil_texture = load_texture(os.path.join(script_dir, "assets/elementos_de_cenario/mancha_oleo.png"))
+    invulnerability_texture = load_texture(os.path.join(script_dir, "assets/elementos_de_cenario/invecibilidade asset.png"))
 
     police_textures = {
-        'normal_1': load_texture(os.path.join(script_dir, "assets/police_1.png")),
-        'normal_2': load_texture(os.path.join(script_dir, "assets/police_2.png")),
-        'dead': load_texture(os.path.join(script_dir, "assets/police_dead.png"))
+        'normal_1': load_texture(os.path.join(script_dir, "assets/veiculos/police_1.png")),
+        'normal_2': load_texture(os.path.join(script_dir, "assets/veiculos/police_2.png")),
+        'dead': load_texture(os.path.join(script_dir, "assets/veiculos/police_dead.png"))
     }
     
     try:
@@ -328,17 +339,19 @@ def main():
     except Exception:
         pass
     
-    if not all([truck_texture, truck_dead_texture, hole_texture, oil_texture] + enemy_textures_up + enemy_textures_down + enemy_dead_textures_up + enemy_dead_textures_down + list(police_textures.values())):
+    if not all([truck_texture, truck_dead_texture, truck_armored_texture, hole_texture, oil_texture, invulnerability_texture] + enemy_textures_up + enemy_textures_down + enemy_dead_textures_up + enemy_dead_textures_down + list(police_textures.values())):
         glfw.terminate()
         sys.exit("Failed to load one or more textures.")
 
-    player_truck = Truck(truck_texture, truck_dead_texture)
+    player_truck = Truck(truck_texture, truck_dead_texture, truck_armored_texture)
     enemies_up, enemies_down = [], []
     holes = []
     oil_stains = []
+    invulnerability_powerups = []
     spawn_timer_up, spawn_timer_down = 0, 0
     hole_spawn_timer = 0
     oil_stain_spawn_timer = 0
+    invulnerability_spawn_timer = 0
     spawn_rate = 1000
 
     enemy_up_texture_pairs = list(zip(enemy_textures_up, enemy_dead_textures_up))
@@ -459,8 +472,9 @@ def main():
                 if not enemy.crashed and player_truck.check_collision(enemy):
                     # O inimigo sempre fica crashed quando há colisão
                     enemy.crashed = True
-                    # O caminhão toma dano usando o sistema de vidas
-                    player_truck.take_damage()
+                    # O caminhão só toma dano se não estiver blindado
+                    if not player_truck.armored:
+                        player_truck.take_damage()
                 
                 # inimigos crashados continuam sendo empurrados pelo scroll
                 if enemy.crashed:
@@ -550,6 +564,48 @@ def main():
             
             # Remove manchas que saíram da tela ou foram usadas
             oil_stains = [o for o in oil_stains if o.active and o.y > -o.height]
+            
+            # --- Invulnerability Power-Up Spawning ---
+            invulnerability_spawn_timer += 0.2  # Incrementa o timer para spawn (mais lento)
+            invulnerability_spawn_rate = current_spawn_rate * 2.0  # Taxa de spawn muito mais lenta que outros elementos
+            current_invulnerability_probability = difficulty_manager.get_current_invulnerability_spawn_probability()
+            
+            if invulnerability_spawn_timer >= invulnerability_spawn_rate:
+                invulnerability_spawn_timer = 0
+                # Verificação de probabilidade (com probabilidade garantida a cada X tentativas)
+                static_spawn_counter = getattr(difficulty_manager, 'invulnerability_spawn_counter', 0) + 1
+                difficulty_manager.invulnerability_spawn_counter = static_spawn_counter
+                
+                # Força o spawn a cada 5 tentativas, independente da probabilidade (mais frequente para testes)
+                force_spawn = (static_spawn_counter >= 5)
+                if force_spawn:
+                    difficulty_manager.invulnerability_spawn_counter = 0
+                
+                if force_spawn or random.random() < current_invulnerability_probability:
+                    # Pode aparecer em qualquer faixa
+                    all_lanes = range(0, LANE_COUNT_PER_DIRECTION * 2)
+                    # Verifica se há faixas seguras (sem outros power-ups muito próximos)
+                    safe_lanes = [lane for lane in all_lanes if 
+                                 max((p.y for p in invulnerability_powerups if p.lane_index == lane), default=0) < SCREEN_HEIGHT - safety_distance]
+                    
+                    # Se não houver faixas seguras, usa todas as faixas
+                    if not safe_lanes:
+                        safe_lanes = all_lanes
+                        
+                    chosen_lane = random.choice(safe_lanes)
+                    invulnerability_powerups.append(InvulnerabilityPowerUp(invulnerability_texture, lane_index=chosen_lane, speed_multiplier=enemy_speed_multiplier))
+            
+            # --- Invulnerability Power-Up Update & Collision ---
+            for powerup in invulnerability_powerups:
+                powerup.update(scroll_speed)  # Passa a velocidade atual de rolagem
+                if powerup.active and player_truck.check_invulnerability_powerup_collision(powerup):
+                    # Power-up desaparece após uso
+                    powerup.active = False
+                    # Ativa o efeito de invulnerabilidade e transforma em carro blindado
+                    player_truck.activate_invulnerability_powerup()
+            
+            # Remove power-ups que saíram da tela ou foram usados
+            invulnerability_powerups = [p for p in invulnerability_powerups if p.active and p.y > -p.height]
 
             # Propagação de colisão: inimigos crashados podem colidir com outros
             def _rects_overlap(a, b):
@@ -625,6 +681,10 @@ def main():
             # Desenha as manchas de óleo
             for oil_stain in oil_stains:
                 oil_stain.draw()
+                
+            # Desenha os power-ups de invulnerabilidade
+            for powerup in invulnerability_powerups:
+                powerup.draw()
                 
             player_truck.draw()
             for enemy in enemies_up:
@@ -743,6 +803,14 @@ def main():
             os_norm = clamp01(oil_prob / max_os)
             draw_text("Óleo (F10 / F11)", label_x, y0)
             draw_text(f"{oil_prob:.2f} prob.", label_x, y0 - line_height)
+            y0 -= group_spacing
+            
+            # Invulnerability Power-Up Spawn Probability
+            inv_prob = difficulty_info.get("invulnerability_spawn_probability", 0.0)
+            max_inv = difficulty_manager.max_invulnerability_spawn_probability
+            inv_norm = clamp01(inv_prob / max_inv)
+            draw_text("Invuln (F12 / Ins)", label_x, y0)
+            draw_text(f"{inv_prob:.2f} prob.", label_x, y0 - line_height)
             y0 -= group_spacing
 
             # Mode / ajuda de teclas
