@@ -1,0 +1,339 @@
+# Gerencia pré-carregamento e reprodução de sons (pygame.mixer) de forma genérica.
+# API pública:
+#   preload_sound(path) -> threading.Event
+#   get_preloaded_sounds(path) -> (full_sound, loop_sound, tmp_path)
+#   SoundPlayer(path) -> objeto com .start(), .stop(), .is_playing()
+#   stop_all() -> para todos os players ativos
+import threading
+import wave
+import tempfile
+import os
+import time
+import pygame
+
+_audio_cache = {}  # path -> {"full": Sound|None, "loop": Sound|None, "tmp": path|None, "ready_event": Event, "lock": Lock}
+_audio_cache_lock = threading.Lock()
+
+_players_lock = threading.Lock()
+_active_players = set()
+
+
+def _ensure_mixer_initialized(framerate=None, sampwidth=None, nchannels=None):
+    """Inicializa pygame.mixer se necessário, tentando usar parâmetros do WAV quando disponíveis."""
+    try:
+        if not pygame.mixer.get_init():
+            if framerate is None:
+                pygame.mixer.init()
+            else:
+                size = -8 * sampwidth if sampwidth and sampwidth > 1 else 8
+                pygame.mixer.init(frequency=framerate, size=size, channels=nchannels or 2)
+    except Exception as e:
+        # Falha na inicialização do mixer não deve quebrar o jogo; apenas logamos.
+        print(f"Warning: pygame.mixer.init failed: {e}")
+
+
+def preload_sound(path, create_loop=True):
+    """
+    Inicia (assíncrono) o pré-carregamento do áudio para evitar I/O bloqueante no spawn.
+    Se create_loop=False, apenas carrega a versão "full" e não cria o tmp/loop.
+    Retorna um threading.Event que será setado quando o som estiver pronto no cache.
+    """
+    with _audio_cache_lock:
+        entry = _audio_cache.get(path)
+        if entry:
+            return entry["ready_event"]
+        ready_ev = threading.Event()
+        # Guardamos também a intenção de criar loop para a operação atual (nota: cache key é o path)
+        _audio_cache[path] = {"full": None, "loop": None, "tmp": None, "ready_event": ready_ev, "lock": threading.Lock(), "create_loop": create_loop}
+
+    def _bg_load():
+        try:
+            with _audio_cache[path]["lock"]:
+                # Re-check
+                if _audio_cache[path]["full"]:
+                    _audio_cache[path]["ready_event"].set()
+                    return
+                # Lê header para inicializar mixer com parâmetros adequados
+                try:
+                    with wave.open(path, 'rb') as wf:
+                        nch = wf.getnchannels()
+                        sw = wf.getsampwidth()
+                        fr = wf.getframerate()
+                        _ensure_mixer_initialized(framerate=fr, sampwidth=sw, nchannels=nch)
+                except Exception as e:
+                    print(f"Failed to read wave during preload: {e}")
+
+                # Carrega full sound
+                try:
+                    full = pygame.mixer.Sound(path)
+                    _audio_cache[path]["full"] = full
+                except Exception as e:
+                    print(f"Failed to preload full sound: {e}")
+                    _audio_cache[path]["full"] = None
+
+                # Se a chamada solicitou criar loop, tenta criar o tmp/loop; caso contrário, ignora
+                try:
+                    if create_loop:
+                        with wave.open(path, 'rb') as wf:
+                            framerate = wf.getframerate()
+                            nframes = wf.getnframes()
+                            start_frame = int(4 * framerate)
+                            if start_frame < nframes:
+                                wf.setpos(start_frame)
+                                loop_frames = wf.readframes(nframes - start_frame)
+                                if loop_frames:
+                                    tmp = tempfile.NamedTemporaryFile(delete=False, suffix='.wav')
+                                    tmp_name = tmp.name
+                                    tmp.close()
+                                    with wave.open(tmp_name, 'wb') as outw:
+                                        outw.setnchannels(wf.getnchannels())
+                                        outw.setsampwidth(wf.getsampwidth())
+                                        outw.setframerate(wf.getframerate())
+                                        outw.writeframes(loop_frames)
+                                    _audio_cache[path]["tmp"] = tmp_name
+                                    try:
+                                        loop = pygame.mixer.Sound(tmp_name)
+                                        _audio_cache[path]["loop"] = loop
+                                    except Exception as e:
+                                        print(f"Failed to preload loop sound: {e}")
+                                        _audio_cache[path]["loop"] = _audio_cache[path]["full"]
+                                else:
+                                    _audio_cache[path]["loop"] = _audio_cache[path]["full"]
+                            else:
+                                _audio_cache[path]["loop"] = _audio_cache[path]["full"]
+                    else:
+                        _audio_cache[path]["loop"] = _audio_cache[path]["full"]
+                except Exception as e:
+                    print(f"Failed to create preload loop sound: {e}")
+                    _audio_cache[path]["loop"] = _audio_cache[path]["full"]
+        finally:
+            try:
+                _audio_cache[path]["ready_event"].set()
+            except Exception:
+                pass
+
+    t = threading.Thread(target=_bg_load, daemon=True)
+    t.start()
+    return _audio_cache[path]["ready_event"]
+
+
+def get_preloaded_sounds(path):
+    """Retorna (full_sound, loop_sound, tmp_path) se já estiverem carregados, senão (None, None, None)."""
+    with _audio_cache_lock:
+        entry = _audio_cache.get(path)
+        if not entry:
+            return (None, None, None)
+        return (entry.get("full"), entry.get("loop"), entry.get("tmp"))
+
+
+class SoundPlayer:
+    """
+    Gerencia reprodução de um som:
+      - Toca a versão "full" uma vez (se existir)
+      - Em seguida toca a versão de "loop" repetidamente (se existir)
+    O loop é reproduzido até chamar .stop()
+    """
+
+    def __init__(self, path, use_loop=True):
+        self.path = path
+        self._use_loop = bool(use_loop)
+        self._full = None
+        self._loop = None
+        self._loop_tmp = None
+        self._own_tmp = False  # True se o player criou seu próprio tmp (quando carregou on-demand)
+        self._stop_event = threading.Event()
+        self._audio_lock = threading.Lock()
+        self._audio_channel = None
+        self._thread = None
+
+        # Try to use preloaded resources
+        full, loop, tmp = get_preloaded_sounds(path)
+        self._full = full
+        # honor use_loop: if user doesn't want loop, ignore preloaded loop
+        self._loop = loop if self._use_loop else None
+        self._loop_tmp = tmp if self._use_loop else None
+
+    def _ensure_loaded_sync(self):
+        """Se não estão pré-carregados, carrega de forma síncrona (menor prioridade)."""
+        # Ensure full always loaded when requested
+        if self._full is None:
+            try:
+                try:
+                    with wave.open(self.path, 'rb') as wf:
+                        nch = wf.getnchannels()
+                        sw = wf.getsampwidth()
+                        fr = wf.getframerate()
+                        _ensure_mixer_initialized(framerate=fr, sampwidth=sw, nchannels=nch)
+                except Exception:
+                    _ensure_mixer_initialized()
+                try:
+                    self._full = pygame.mixer.Sound(self.path)
+                except Exception as e:
+                    print(f"Failed to load full sound on-demand: {e}")
+                    self._full = None
+            except Exception:
+                pass
+
+        # If loop not desired, skip loop creation entirely
+        if not self._use_loop:
+            self._loop = None
+            return
+
+        # Create loop if missing
+        if self._loop is None:
+            try:
+                with wave.open(self.path, 'rb') as wf:
+                    framerate = wf.getframerate()
+                    nframes = wf.getnframes()
+                    start_frame = int(4 * framerate)
+                    if start_frame < nframes:
+                        wf.setpos(start_frame)
+                        loop_frames = wf.readframes(nframes - start_frame)
+                        if loop_frames:
+                            tmp = tempfile.NamedTemporaryFile(delete=False, suffix='.wav')
+                            tmp_name = tmp.name
+                            tmp.close()
+                            with wave.open(tmp_name, 'wb') as outw:
+                                outw.setnchannels(wf.getnchannels())
+                                outw.setsampwidth(wf.getsampwidth())
+                                outw.setframerate(wf.getframerate())
+                                outw.writeframes(loop_frames)
+                            self._loop_tmp = tmp_name
+                            self._own_tmp = True
+                            try:
+                                self._loop = pygame.mixer.Sound(self._loop_tmp)
+                            except Exception as e:
+                                print(f"Failed to load loop sound on-demand: {e}")
+                                self._loop = self._full
+                        else:
+                            self._loop = self._full
+                    else:
+                        self._loop = self._full
+            except Exception as e:
+                print(f"Failed to create loop sound on-demand: {e}")
+                self._loop = self._full
+
+    def _is_playing_channel(self, ch):
+        try:
+            return ch is not None and getattr(ch, "get_busy", lambda: False)()
+        except Exception:
+            return False
+
+    def _run(self):
+        self._stop_event.clear()
+        try:
+            # Ensure resources loaded
+            self._ensure_loaded_sync()
+
+            # play full once
+            if self._full:
+                try:
+                    ch = self._full.play()
+                    with self._audio_lock:
+                        self._audio_channel = ch
+                    while not self._stop_event.is_set() and self._is_playing_channel(ch):
+                        time.sleep(0.1)
+                except Exception as e:
+                    print(f"Audio play error (full): {e}")
+                finally:
+                    try:
+                        with self._audio_lock:
+                            if self._audio_channel is ch:
+                                self._audio_channel = None
+                    except Exception:
+                        pass
+
+            # play loop
+            if self._loop:
+                try:
+                    ch = self._loop.play(loops=-1)
+                    with self._audio_lock:
+                        self._audio_channel = ch
+                    while not self._stop_event.is_set():
+                        time.sleep(0.1)
+                    try:
+                        if ch.get_busy():
+                            ch.stop()
+                    except Exception:
+                        pass
+                except Exception as e:
+                    print(f"Audio play error (loop): {e}")
+                finally:
+                    try:
+                        with self._audio_lock:
+                            if self._audio_channel is ch:
+                                self._audio_channel = None
+                    except Exception:
+                        pass
+        finally:
+            # cleanup only for own tmp
+            try:
+                if self._own_tmp and self._loop_tmp and os.path.isfile(self._loop_tmp):
+                    try:
+                        os.unlink(self._loop_tmp)
+                    except Exception:
+                        pass
+                    self._loop_tmp = None
+            except Exception:
+                pass
+            try:
+                with self._audio_lock:
+                    self._audio_channel = None
+            except Exception:
+                pass
+            # remove from active players
+            with _players_lock:
+                _active_players.discard(self)
+
+    def start(self):
+        if self._thread and self._thread.is_alive():
+            return
+        # Register
+        with _players_lock:
+            _active_players.add(self)
+        self._stop_event.clear()
+        self._thread = threading.Thread(target=self._run, daemon=True)
+        self._thread.start()
+
+    def stop(self):
+        # Signal stop
+        try:
+            self._stop_event.set()
+        except Exception:
+            pass
+
+        play_to_stop = None
+        try:
+            with self._audio_lock:
+                play_to_stop = self._audio_channel
+                self._audio_channel = None
+        except Exception:
+            play_to_stop = None
+
+        try:
+            if play_to_stop and self._is_playing_channel(play_to_stop):
+                try:
+                    play_to_stop.stop()
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
+    def is_playing(self):
+        try:
+            with self._audio_lock:
+                ch = self._audio_channel
+            return self._is_playing_channel(ch)
+        except Exception:
+            return False
+
+
+def stop_all():
+    """Para todos os players ativos."""
+    with _players_lock:
+        players = list(_active_players)
+    for p in players:
+        try:
+            p.stop()
+        except Exception:
+            pass
