@@ -140,11 +140,15 @@ class PoliceCar:
             if target.crashed:
                 continue
             if self._check_rear_end_collision(target):
-                target.crashed = True
                 if target is player_truck:
-                    # Se o player estiver blindado, ele não fica crashed, mas a polícia sim
-                    if not player_truck.armored:
+                    # Se o player estiver invulnerável ou blindado, a polícia fica crashed, mas o player não
+                    if player_truck.invulnerable or player_truck.armored:
                         self.crashed = True
                     else:
-                        self.crashed = True  # A polícia sempre fica crashed ao colidir
+                        # Se o player não estiver protegido, ele fica crashed
+                        target.crashed = True
+                        self.crashed = True
+                else:
+                    # Para outros inimigos que não o player
+                    target.crashed = True
                 break
