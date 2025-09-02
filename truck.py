@@ -77,14 +77,14 @@ class Truck:
 
         # Efeito visual baseado no estado do caminhão
         if self.invulnerable and self.armored:
-            # Efeito dourado para o carro blindado
+            # Efeito prateado para o carro blindado
             blink_speed = 4
-            gold_intensity = 0.7 + 0.3 * abs((time.time() * blink_speed) % 2 - 1)
-            glColor4f(1.0, gold_intensity, 0.3, 1.0)
+            silver_intensity = 0.8 + 0.2 * abs((time.time() * blink_speed) % 2 - 1)
+            glColor4f(silver_intensity, silver_intensity, silver_intensity, 1.0)
         elif self.invulnerable:
             # Calcula a transparência baseada no tempo para criar efeito de piscar
             blink_speed = 6  # Velocidade do piscar
-            alpha = 0.3 + 0.7 * abs((time.time() * blink_speed) % 2 - 1)
+            alpha = 0.5 + 0.5 * abs((time.time() * blink_speed) % 2 - 1)
             glColor4f(1.0, 1.0, 1.0, alpha)
         elif self.slowed_down:
             # Efeito visual para quando está com velocidade reduzida (cor azulada)

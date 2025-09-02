@@ -10,6 +10,7 @@ import time
 
 from road import draw_road, SCREEN_WIDTH, SCREEN_HEIGHT, GAME_WIDTH, PANEL_WIDTH, COLOR_PANEL, draw_rect, PLAYER_SPEED, \
     ROAD_WIDTH, LANE_COUNT_PER_DIRECTION, LANE_WIDTH
+import road
 from truck import Truck
 from enemy import Enemy, EnemyDown
 import police
@@ -26,6 +27,73 @@ import audio_manager
 GAME_STATE_MENU = 0
 GAME_STATE_PLAYING = 1
 GAME_STATE_GAME_OVER = 2
+
+# --- Variáveis Globais para Toggle Borderless ---
+is_borderless = False
+_prev_window_pos = (0, 0)
+_prev_window_size = (SCREEN_WIDTH, SCREEN_HEIGHT)
+
+def toggle_borderless(window):
+    """Alterna entre modo janela normal e borderless fullscreen (com fallbacks seguros)."""
+    global is_borderless, _prev_window_pos, _prev_window_size
+
+    monitor = glfw.get_primary_monitor()
+    video_mode = glfw.get_video_mode(monitor)
+
+    # Obtém largura, altura e refresh com vários fallbacks (diferentes bindings expõem nomes diferentes)
+    vm_width = None
+    vm_height = None
+    vm_refresh = None
+    # atributos comuns
+    vm_width = getattr(video_mode, "width", None)
+    vm_height = getattr(video_mode, "height", None)
+    vm_refresh = getattr(video_mode, "refresh_rate", None) or getattr(video_mode, "refreshRate", None)
+
+    # fallback para comportamento tipo tuple
+    if vm_width is None or vm_height is None:
+        try:
+            vm_width = video_mode[0]
+            vm_height = video_mode[1]
+            # refresh geralmente está no índice 4
+            vm_refresh = vm_refresh or (video_mode[4] if len(video_mode) > 4 else None)
+        except Exception:
+            vm_width, vm_height, vm_refresh = 800, 600, 0
+
+    # garante valores inteiros
+    try:
+        vm_width = int(vm_width)
+        vm_height = int(vm_height)
+    except Exception:
+        vm_width, vm_height = 800, 600
+
+    vm_refresh = int(vm_refresh) if vm_refresh is not None else 0
+
+    if is_borderless:
+        # Volta para modo janela (restaura posição/tamanho anteriores)
+        glfw.set_window_monitor(window, None,
+                               _prev_window_pos[0], _prev_window_pos[1],
+                               _prev_window_size[0], _prev_window_size[1],
+                               vm_refresh)
+        glfw.set_window_attrib(window, glfw.DECORATED, glfw.TRUE)
+        is_borderless = False
+        print("Switched to windowed mode")
+    else:
+        # Salva estado atual e entra em borderless fullscreen cobrindo o monitor primário
+        try:
+            _prev_window_pos = glfw.get_window_pos(window)
+            _prev_window_size = glfw.get_window_size(window)
+        except Exception:
+            _prev_window_pos = (0, 0)
+            _prev_window_size = (vm_width, vm_height)
+
+        monitor_x, monitor_y = glfw.get_monitor_pos(monitor)
+        glfw.set_window_monitor(window, monitor,
+                               monitor_x, monitor_y,
+                               vm_width, vm_height,
+                               vm_refresh)
+        glfw.set_window_attrib(window, glfw.DECORATED, glfw.FALSE)
+        is_borderless = True
+        print("Switched to borderless fullscreen")
 
 # --- Variáveis Globais ---
 scroll_pos = 0.0
@@ -87,6 +155,10 @@ def key_callback(window, key, scancode, action, mods):
             # Limita o tamanho do nome a 15 caracteres
             if len(player_name) < 15:
                 player_name += chr(key)
+
+    # Toggle borderless fullscreen com Alt+Enter
+    if action == glfw.PRESS and (mods & glfw.MOD_ALT) and key == glfw.KEY_ENTER:
+        toggle_borderless(window)
 
     # Controles manuais para dificuldade (F1-F11)
     if action == glfw.PRESS:
@@ -183,13 +255,13 @@ def mouse_button_callback(window, button, action, mods):
 # --- Funções Auxiliares de Menu ---
 def get_hovered_button_main_menu(mouse_x, mouse_y):
     button_width = 250
-    button_x = (SCREEN_WIDTH - button_width) / 2
+    button_x = (road.SCREEN_WIDTH - button_width) / 2
     # Inverte a coordenada Y do mouse para corresponder ao sistema do OpenGL
-    inverted_mouse_y = SCREEN_HEIGHT - mouse_y
+    inverted_mouse_y = road.SCREEN_HEIGHT - mouse_y
     buttons = [
-        {"y": SCREEN_HEIGHT / 2 - 50, "action": "start"},
-        {"y": SCREEN_HEIGHT / 2 - 120, "action": "instructions"},
-        {"y": SCREEN_HEIGHT / 2 - 190, "action": "quit"}
+        {"y": road.SCREEN_HEIGHT / 2 - 50, "action": "start"},
+        {"y": road.SCREEN_HEIGHT / 2 - 120, "action": "instructions"},
+        {"y": road.SCREEN_HEIGHT / 2 - 190, "action": "quit"}
     ]
     for btn in buttons:
         if button_x <= mouse_x <= button_x + button_width and btn["y"] <= inverted_mouse_y <= btn["y"] + 50:
@@ -198,22 +270,22 @@ def get_hovered_button_main_menu(mouse_x, mouse_y):
 
 def get_hovered_button_instructions_menu(mouse_x, mouse_y):
     button_width = 200
-    button_x = (SCREEN_WIDTH - button_width) / 2
+    button_x = (road.SCREEN_WIDTH - button_width) / 2
     button_y = 100
     # Inverte a coordenada Y do mouse para corresponder ao sistema do OpenGL
-    inverted_mouse_y = SCREEN_HEIGHT - mouse_y
+    inverted_mouse_y = road.SCREEN_HEIGHT - mouse_y
     if button_x <= mouse_x <= button_x + button_width and button_y <= inverted_mouse_y <= button_y + 50:
         return "main"
     return None
 
 def get_hovered_button_game_over_menu(mouse_x, mouse_y):
     button_width = 250
-    button_x = (SCREEN_WIDTH - button_width) / 2
+    button_x = (road.SCREEN_WIDTH - button_width) / 2
     # Inverte a coordenada Y do mouse para corresponder ao sistema do OpenGL
-    inverted_mouse_y = SCREEN_HEIGHT - mouse_y
+    inverted_mouse_y = road.SCREEN_HEIGHT - mouse_y
     buttons = [
-        {"y": SCREEN_HEIGHT / 2 - 50, "action": "restart"},
-        {"y": SCREEN_HEIGHT / 2 - 120, "action": "main"}
+        {"y": road.SCREEN_HEIGHT / 2 - 50, "action": "restart"},
+        {"y": road.SCREEN_HEIGHT / 2 - 120, "action": "main"}
     ]
     for btn in buttons:
         if button_x <= mouse_x <= button_x + button_width and btn["y"] <= inverted_mouse_y <= btn["y"] + 50:
@@ -319,7 +391,7 @@ def main():
     script_dir = os.path.dirname(os.path.abspath(__file__))
     truck_texture = load_texture(os.path.join(script_dir, "assets/veiculos/protagonista/truck.png"))
     truck_dead_texture = load_texture(os.path.join(script_dir, "assets/veiculos/protagonista/truck_dead.png"))
-    truck_armored_texture = load_texture(os.path.join(script_dir, "assets/veiculos/protagonista/carro blindado.png"))
+    truck_armored_texture = load_texture(os.path.join(script_dir, "assets/veiculos/protagonista/armored_truck.png"))
     enemy_textures_up = [load_texture(os.path.join(script_dir, f"assets/veiculos/up_{color}.png")) for color in ["black", "green", "red", "yellow"]]
     enemy_textures_down = [load_texture(os.path.join(script_dir, f"assets/veiculos/down_{color}.png")) for color in ["black", "green", "red", "yellow"]]
     enemy_dead_textures_up = [load_texture(os.path.join(script_dir, f"assets/veiculos/up_{color}_dead.png")) for color in ["black", "green", "red", "yellow"]]
@@ -359,6 +431,13 @@ def main():
 
     while not glfw.window_should_close(window):
         glfw.poll_events()
+
+        # --- Sincronizar resolução dinamicamente com road.py ---
+        fb_width, fb_height = glfw.get_framebuffer_size(window)
+        road.SCREEN_WIDTH = fb_width
+        road.SCREEN_HEIGHT = fb_height
+        road.GAME_WIDTH = fb_width - PANEL_WIDTH
+        road.PANEL_WIDTH = PANEL_WIDTH  # Mantém painel lateral fixo
 
         # --- Game State Logic ---
         if current_game_state == GAME_STATE_PLAYING:
