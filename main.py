@@ -308,8 +308,8 @@ def main():
 
     # --- Load Textures ---
     script_dir = os.path.dirname(os.path.abspath(__file__))
-    truck_texture = load_texture(os.path.join(script_dir, "assets/sprite_racing.png"))
-    truck_dead_texture = load_texture(os.path.join(script_dir, "assets/sprite_racing_dead.png"))
+    truck_texture = load_texture(os.path.join(script_dir, "assets/truck.png"))
+    truck_dead_texture = load_texture(os.path.join(script_dir, "assets/truck_dead.png"))
     enemy_textures_up = [load_texture(os.path.join(script_dir, f"assets/up_{color}.png")) for color in ["black", "green", "red", "yellow"]]
     enemy_textures_down = [load_texture(os.path.join(script_dir, f"assets/down_{color}.png")) for color in ["black", "green", "red", "yellow"]]
     enemy_dead_textures_up = [load_texture(os.path.join(script_dir, f"assets/up_{color}_dead.png")) for color in ["black", "green", "red", "yellow"]]
