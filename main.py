@@ -48,9 +48,9 @@ def toggle_borderless(window):
     if is_borderless:
         # Volta para modo janela (restaura posição/tamanho anteriores)
         glfw.set_window_monitor(window, None,
-                               _prev_window_pos[0], _prev_window_pos[1],
-                               _prev_window_size[0], _prev_window_size[1],
-                               vm_refresh)
+                                _prev_window_pos[0], _prev_window_pos[1],
+                                _prev_window_size[0], _prev_window_size[1],
+                                vm_refresh)
         glfw.set_window_attrib(window, glfw.DECORATED, glfw.TRUE)
         is_borderless = False
         print("Switched to windowed mode")
@@ -88,7 +88,7 @@ current_offset = (0.0, 0.0)
 fb_height = SCREEN_HEIGHT
 
 # --- Constantes da Polícia ---
-POLICE_SPAWN_SCORE_THRESHOLD = 500
+POLICE_SPAWN_SCORE_THRESHOLD = 0
 POLICE_COOLDOWN_SECONDS = 10  # Tempo mínimo entre dois spawns de polícia (segundos)
 last_police_spawn_time = -9999.0  # Guarda o tempo do último spawn (usamos glfw.get_time())
 
@@ -110,6 +110,7 @@ def key_callback(window, key, scancode, action, mods):
         if current_game_state == GAME_STATE_PLAYING:
             current_game_state = GAME_STATE_MENU
             menu_state.active_menu = "main"
+            audio_manager.stop_all()
         elif current_game_state == GAME_STATE_MENU:
             if menu_state.active_menu == "instructions":
                 menu_state.active_menu = "main"
@@ -134,6 +135,13 @@ def key_callback(window, key, scancode, action, mods):
             # Limita o tamanho do nome a 15 caracteres
             if len(player_name) < 15:
                 player_name += chr(key)
+
+    # Buzina: tecla Espaço toca o som, salvo quando digitando o nome
+    if key == glfw.KEY_SPACE and action == glfw.PRESS and not asking_for_name:
+        try:
+            audio_manager.play_one_shot("assets/sound/horn.mp3")
+        except Exception as e:
+            print(f"Erro ao tocar buzina: {e}")
 
     # Toggle borderless fullscreen com Alt+Enter
     if action == glfw.PRESS and (mods & glfw.MOD_ALT) and key == glfw.KEY_ENTER:
@@ -193,6 +201,11 @@ def mouse_button_callback(window, button, action, mods):
                     if hovered_button == "start":
                         current_game_state = GAME_STATE_PLAYING
                         reset_game()
+                        # --- Inicia a música de fundo ---
+                        try:
+                            audio_manager.play_background_music("assets/sound/background_music_1.mp3", volume=0.8, fade_ms=500, loop=True)
+                        except Exception as e:
+                            print(f"Erro ao iniciar a música de fundo: {e}")
                     elif hovered_button == "instructions":
                         menu_state.active_menu = "instructions"
                     elif hovered_button == "quit":
@@ -233,6 +246,11 @@ def mouse_button_callback(window, button, action, mods):
                     if hovered_button == "restart":
                         current_game_state = GAME_STATE_PLAYING
                         reset_game()
+                        # --- Inicia a música de fundo --- # <--- NOVO
+                        try:
+                            audio_manager.play_background_music("assets/sound/background_music_1.mp3", volume=0.8, fade_ms=500, loop=True)
+                        except Exception as e:
+                            print(f"Erro ao iniciar a música de fundo: {e}")
                     elif hovered_button == "main":
                         current_game_state = GAME_STATE_MENU
                         menu_state.active_menu = "main"
@@ -278,16 +296,18 @@ def reset_game():
     player_truck.reset()
     enemies_up.clear()
     enemies_down.clear()
-    if police_car:
+
+    # Garantir que todos os players globais de áudio sejam interrompidos
+    # Isso para a sirene, músicas de fundo e outros players.
+    try:
         try:
-            police_car.stop_audio()
+            audio_manager.stop_background_music()
         except Exception:
             pass
-    # Garantir que todos os players globais de áudio sejam interrompidos
-    try:
         audio_manager.stop_all()
-    except Exception:
-        pass
+    except Exception as e:
+        print(f"Erro ao parar todos os áudios: {e}")
+
     police_car = None
     # Reset do timer de spawn da polícia
     last_police_spawn_time = -9999.0
@@ -356,6 +376,13 @@ def main():
     if not glfw.init():
         sys.exit("Could not initialize GLFW.")
 
+    # Inicialização do mixer delegada ao audio_manager (tenta inicializar de forma segura)
+    try:
+        audio_manager._ensure_mixer_initialized()
+    except Exception as e:
+        print(f"Aviso: Falha ao inicializar o pygame mixer via audio_manager: {e}")
+
+
     glutInit(sys.argv)
 
     window = glfw.create_window(SCREEN_WIDTH, SCREEN_HEIGHT, "Beer Truck", None, None)
@@ -386,10 +413,14 @@ def main():
         'dead': load_texture(os.path.join(script_dir, "assets/veiculos/police_dead.png"))
     }
     
+    # --- Pré-carrega os sons ---
     try:
-        audio_manager.preload_sound(os.path.join(script_dir, "assets/sound/police_sound.wav"), create_loop=True)
-    except Exception:
-        pass
+        audio_manager.preload_sound("assets/sound/police_sound.wav", create_loop=True)
+        audio_manager.preload_sound("assets/sound/background_music_1.mp3", create_loop=True)
+        audio_manager.preload_sound("assets/sound/crash.wav", create_loop=False)
+        audio_manager.preload_sound("assets/sound/game_over.wav", create_loop=False)
+    except Exception as e:
+        print(f"Erro ao pré-carregar áudios: {e}")
     
     if not all([truck_texture, truck_dead_texture, truck_armored_texture, hole_texture, oil_texture, invulnerability_texture] + enemy_textures_up + enemy_textures_down + enemy_dead_textures_up + enemy_dead_textures_down + list(police_textures.values())):
         glfw.terminate()
@@ -424,6 +455,9 @@ def main():
 
         # Scale uniformly to fit framebuffer while preserving aspect ratio
         scale = min(fb_width / float(BASE_TOTAL_WIDTH), fb_height / float(BASE_HEIGHT)) if BASE_TOTAL_WIDTH > 0 and BASE_HEIGHT > 0 else 1.0
+        # Prevent zero or negative scale (can happen when framebuffer width/height is 0 e.g. minimized window)
+        if not scale or scale <= 0.0:
+            scale = 1e-6
         scaled_width = BASE_TOTAL_WIDTH * scale
         scaled_height = BASE_HEIGHT * scale
         offset_x = (fb_width - scaled_width) / 2.0
@@ -483,6 +517,16 @@ def main():
                     remaining_crashed_visible = [e for e in crashed_enemies if e.y + e.height >= 0]
                     if not remaining_crashed_visible:
                         current_game_state = GAME_STATE_GAME_OVER
+                        # Para a música de fundo ao entrar na tela de game over
+                        try:
+                            audio_manager.stop_background_music()
+                        except Exception:
+                            pass
+                        # Toca som de game over (não bloqueante)
+                        try:
+                            audio_manager.play_one_shot("assets/sound/game_over.wav")
+                        except Exception as e:
+                            print(f"Erro ao tocar som de game over: {e}")
                         # Verifica se a pontuação atual é um novo high score
                         final_score = int(abs(scroll_pos * 0.1))
                         global new_high_score, asking_for_name
@@ -556,6 +600,11 @@ def main():
                 if not enemy.crashed and player_truck.check_collision(enemy):
                     # O inimigo sempre fica crashed quando há colisão
                     enemy.crashed = True
+                    # Reproduz som de colisão (reutiliza helper para evitar duplicação)
+                    try:
+                        audio_manager.play_one_shot("assets/sound/crash.wav")
+                    except Exception as e:
+                        print(f"Erro ao tocar som de colisão: {e}")
                     # O caminhão só toma dano se não estiver blindado
                     if not player_truck.armored:
                         player_truck.take_damage()
@@ -586,7 +635,7 @@ def main():
                     all_lanes = range(0, LANE_COUNT_PER_DIRECTION * 2)
                     # Relaxamos a restrição de segurança para permitir mais buracos
                     safe_lanes = [lane for lane in all_lanes if 
-                                 max((h.y for h in holes if h.lane_index == lane), default=0) < SCREEN_HEIGHT - safety_distance/2]
+                                  max((h.y for h in holes if h.lane_index == lane), default=0) < SCREEN_HEIGHT - safety_distance/2]
                     
                     # Se não houver faixas seguras, usa todas as faixas
                     if not safe_lanes:
@@ -628,7 +677,7 @@ def main():
                     all_lanes = range(0, LANE_COUNT_PER_DIRECTION * 2)
                     # Relaxamos a restrição de segurança para permitir mais manchas
                     safe_lanes = [lane for lane in all_lanes if 
-                                 max((o.y for o in oil_stains if o.lane_index == lane), default=0) < SCREEN_HEIGHT - safety_distance/2]
+                                  max((o.y for o in oil_stains if o.lane_index == lane), default=0) < SCREEN_HEIGHT - safety_distance/2]
                     
                     # Se não houver faixas seguras, usa todas as faixas
                     if not safe_lanes:
@@ -670,7 +719,7 @@ def main():
                     all_lanes = range(0, LANE_COUNT_PER_DIRECTION * 2)
                     # Verifica se há faixas seguras (sem outros power-ups muito próximos)
                     safe_lanes = [lane for lane in all_lanes if 
-                                 max((p.y for p in invulnerability_powerups if p.lane_index == lane), default=0) < SCREEN_HEIGHT - safety_distance]
+                                  max((p.y for p in invulnerability_powerups if p.lane_index == lane), default=0) < SCREEN_HEIGHT - safety_distance]
                     
                     # Se não houver faixas seguras, usa todas as faixas
                     if not safe_lanes:
@@ -729,8 +778,10 @@ def main():
             # Convert mouse pixel coords -> logical base coordinates
             mouse_px, mouse_py = glfw.get_cursor_pos(window)
             inv_mouse_py = fb_height - mouse_py
-            mouse_x = (mouse_px - offset_x) / scale
-            mouse_y = (inv_mouse_py - offset_y) / scale
+            # Use a safe_scale to avoid division by zero when framebuffer dimensions are zero
+            safe_scale = scale if scale and scale > 0.0 else 1e-6
+            mouse_x = (mouse_px - offset_x) / safe_scale
+            mouse_y = (inv_mouse_py - offset_y) / safe_scale
 
             if current_game_state == GAME_STATE_MENU:
                 if menu_state.active_menu == "main":

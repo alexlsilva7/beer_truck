@@ -11,6 +11,20 @@ import os
 import time
 import pygame
 
+def _resolve_path(path):
+    """Resolve caminhos relativos (ex: 'assets/sound/crash.wav') para base do projeto.
+    Se já for absoluto, retorna inalterado.
+    """
+    try:
+        if not path:
+            return path
+        if os.path.isabs(path):
+            return path
+        base = os.path.dirname(os.path.abspath(__file__))
+        return os.path.join(base, path)
+    except Exception:
+        return path
+
 _audio_cache = {}  # path -> {"full": Sound|None, "loop": Sound|None, "tmp": path|None, "ready_event": Event, "lock": Lock}
 _audio_cache_lock = threading.Lock()
 
@@ -37,14 +51,19 @@ def preload_sound(path, create_loop=True):
     Inicia (assíncrono) o pré-carregamento do áudio para evitar I/O bloqueante no spawn.
     Se create_loop=False, apenas carrega a versão "full" e não cria o tmp/loop.
     Retorna um threading.Event que será setado quando o som estiver pronto no cache.
+    Aceita caminhos relativos ao diretório deste módulo.
     """
+    path = _resolve_path(path)
     with _audio_cache_lock:
         entry = _audio_cache.get(path)
         if entry:
             return entry["ready_event"]
         ready_ev = threading.Event()
-        # Guardamos também a intenção de criar loop para a operação atual (nota: cache key é o path)
-        _audio_cache[path] = {"full": None, "loop": None, "tmp": None, "ready_event": ready_ev, "lock": threading.Lock(), "create_loop": create_loop}
+        _audio_cache[path] = {
+            "full": None, "loop": None, "tmp": None,
+            "ready_event": ready_ev, "lock": threading.Lock(),
+            "create_loop": create_loop
+        }
 
     def _bg_load():
         try:
@@ -119,6 +138,7 @@ def preload_sound(path, create_loop=True):
 
 def get_preloaded_sounds(path):
     """Retorna (full_sound, loop_sound, tmp_path) se já estiverem carregados, senão (None, None, None)."""
+    path = _resolve_path(path)
     with _audio_cache_lock:
         entry = _audio_cache.get(path)
         if not entry:
@@ -135,18 +155,18 @@ class SoundPlayer:
     """
 
     def __init__(self, path, use_loop=True):
+        path = _resolve_path(path)
         self.path = path
         self._use_loop = bool(use_loop)
         self._full = None
         self._loop = None
         self._loop_tmp = None
-        self._own_tmp = False  # True se o player criou seu próprio tmp (quando carregou on-demand)
+        self._own_tmp = False
         self._stop_event = threading.Event()
         self._audio_lock = threading.Lock()
         self._audio_channel = None
         self._thread = None
 
-        # Try to use preloaded resources
         full, loop, tmp = get_preloaded_sounds(path)
         self._full = full
         # honor use_loop: if user doesn't want loop, ignore preloaded loop
@@ -328,6 +348,91 @@ class SoundPlayer:
             return False
 
 
+# Background music helpers using pygame.mixer.music (streaming, low memory)
+_bg_lock = threading.Lock()
+_bg_current_path = None
+
+def play_background_music(path, volume=0.8, fade_ms=500, loop=True):
+    """
+    Reproduz música de fundo usando pygame.mixer.music (streaming).
+    Não reinicia se a mesma música já estiver tocando.
+    Retorna True em sucesso, False caso contrário.
+    Aceita caminho relativo.
+    """
+    global _bg_current_path
+    path = _resolve_path(path)
+    try:
+        _ensure_mixer_initialized()
+        with _bg_lock:
+            try:
+                if _bg_current_path == path and pygame.mixer.music.get_busy():
+                    # Ajusta volume caso solicitem sem reiniciar
+                    try:
+                        pygame.mixer.music.set_volume(volume)
+                    except Exception:
+                        pass
+                    return True
+
+                # Carrega e toca
+                pygame.mixer.music.load(path)
+                try:
+                    pygame.mixer.music.set_volume(volume)
+                except Exception:
+                    pass
+                loops = -1 if loop else 0
+                # play aceita fade_ms em pygame 2.x através de keyword em alguns sistemas;
+                # usamos play + fadeout/fade como fallback onde necessário.
+                try:
+                    pygame.mixer.music.play(loops=loops, fade_ms=fade_ms)
+                except TypeError:
+                    # fallback se play não aceitar fade_ms
+                    pygame.mixer.music.play(loops=loops)
+                    if fade_ms and fade_ms > 0:
+                        try:
+                            pygame.mixer.music.set_volume(0.0)
+                            # simple linear fade-in on a separate thread would be better; keep minimal
+                            pygame.mixer.music.set_volume(volume)
+                        except Exception:
+                            pass
+
+                _bg_current_path = path
+                return True
+            except Exception as e:
+                print(f"Failed to play background music via mixer.music: {e}")
+                return False
+    except Exception as e:
+        print(f"play_background_music error: {e}")
+        return False
+
+def stop_background_music(fade_ms=500):
+    """
+    Para a música de fundo. Se fade_ms > 0 tenta fadeout, senão stop direto.
+    """
+    global _bg_current_path
+    try:
+        with _bg_lock:
+            try:
+                if pygame.mixer.get_init() and pygame.mixer.music.get_busy():
+                    if fade_ms and fade_ms > 0:
+                        try:
+                            pygame.mixer.music.fadeout(fade_ms)
+                        except Exception:
+                            pygame.mixer.music.stop()
+                    else:
+                        pygame.mixer.music.stop()
+            except Exception:
+                pass
+            _bg_current_path = None
+    except Exception as e:
+        print(f"stop_background_music error: {e}")
+
+def is_background_music_playing():
+    try:
+        return pygame.mixer.get_init() and pygame.mixer.music.get_busy()
+    except Exception:
+        return False
+
+
 def stop_all():
     """Para todos os players ativos."""
     with _players_lock:
@@ -337,3 +442,18 @@ def stop_all():
             p.stop()
         except Exception:
             pass
+
+def play_one_shot(path):
+    """Toca um som uma vez (não em loop). Retorna o SoundPlayer ou None em falha.
+    Aceita caminho relativo.
+    """
+    try:
+        player = SoundPlayer(path, use_loop=False)  # SoundPlayer já resolve o caminho
+        player.start()
+        return player
+    except Exception as e:
+        try:
+            print(f"play_one_shot error: {e}")
+        except Exception:
+            pass
+        return None
