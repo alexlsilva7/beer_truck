@@ -40,33 +40,10 @@ def toggle_borderless(window):
     monitor = glfw.get_primary_monitor()
     video_mode = glfw.get_video_mode(monitor)
 
-    # Obtém largura, altura e refresh com vários fallbacks (diferentes bindings expõem nomes diferentes)
-    vm_width = None
-    vm_height = None
-    vm_refresh = None
-    # atributos comuns
-    vm_width = getattr(video_mode, "width", None)
-    vm_height = getattr(video_mode, "height", None)
-    vm_refresh = getattr(video_mode, "refresh_rate", None) or getattr(video_mode, "refreshRate", None)
-
-    # fallback para comportamento tipo tuple
-    if vm_width is None or vm_height is None:
-        try:
-            vm_width = video_mode[0]
-            vm_height = video_mode[1]
-            # refresh geralmente está no índice 4
-            vm_refresh = vm_refresh or (video_mode[4] if len(video_mode) > 4 else None)
-        except Exception:
-            vm_width, vm_height, vm_refresh = 800, 600, 0
-
-    # garante valores inteiros
-    try:
-        vm_width = int(vm_width)
-        vm_height = int(vm_height)
-    except Exception:
-        vm_width, vm_height = 800, 600
-
-    vm_refresh = int(vm_refresh) if vm_refresh is not None else 0
+    # Obtém largura, altura e refresh
+    vm_width = int(video_mode.size.width)
+    vm_height = int(video_mode.size.height)
+    vm_refresh = int(video_mode.refresh_rate)
 
     if is_borderless:
         # Volta para modo janela (restaura posição/tamanho anteriores)
@@ -105,13 +82,15 @@ current_game_state = GAME_STATE_MENU
 menu_state = MenuState()
 police_car = None  # Variável para controlar o carro da polícia
 
+# Variáveis para cálculo de viewport e coordenadas do mouse, acessadas por callbacks
+current_scale = 1.0
+current_offset = (0.0, 0.0)
+fb_height = SCREEN_HEIGHT
+
 # --- Constantes da Polícia ---
 POLICE_SPAWN_SCORE_THRESHOLD = 500
 POLICE_COOLDOWN_SECONDS = 10  # Tempo mínimo entre dois spawns de polícia (segundos)
 last_police_spawn_time = -9999.0  # Guarda o tempo do último spawn (usamos glfw.get_time())
-
-# --- Constantes da Polícia ---
-POLICE_SPAWN_SCORE_THRESHOLD = 500
 
 player_name = ""
 asking_for_name = False
@@ -192,14 +171,21 @@ def key_callback(window, key, scancode, action, mods):
 
 
 def mouse_button_callback(window, button, action, mods):
-    global current_game_state, asking_for_name
+    global current_game_state, asking_for_name, current_scale, current_offset, fb_height
 
     if button == glfw.MOUSE_BUTTON_LEFT:
         if action == glfw.PRESS:
             menu_state.mouse_pressed = True
         elif action == glfw.RELEASE:
             menu_state.mouse_pressed = False
-            mouse_x, mouse_y = glfw.get_cursor_pos(window)
+            # Pega coordenadas do cursor em pixels e converte para coordenadas lógicas do jogo
+            mouse_px, mouse_py = glfw.get_cursor_pos(window)
+            inv_mouse_py = (fb_height or SCREEN_HEIGHT) - mouse_py
+            scale = current_scale or 1.0
+            offset_x, offset_y = current_offset or (0.0, 0.0)
+
+            mouse_x = (mouse_px - offset_x) / scale
+            mouse_y = (inv_mouse_py - offset_y) / scale
 
             if current_game_state == GAME_STATE_MENU:
                 if menu_state.active_menu == "main":
@@ -256,15 +242,13 @@ def mouse_button_callback(window, button, action, mods):
 def get_hovered_button_main_menu(mouse_x, mouse_y):
     button_width = 250
     button_x = (road.SCREEN_WIDTH - button_width) / 2
-    # Inverte a coordenada Y do mouse para corresponder ao sistema do OpenGL
-    inverted_mouse_y = road.SCREEN_HEIGHT - mouse_y
     buttons = [
         {"y": road.SCREEN_HEIGHT / 2 - 50, "action": "start"},
         {"y": road.SCREEN_HEIGHT / 2 - 120, "action": "instructions"},
         {"y": road.SCREEN_HEIGHT / 2 - 190, "action": "quit"}
     ]
     for btn in buttons:
-        if button_x <= mouse_x <= button_x + button_width and btn["y"] <= inverted_mouse_y <= btn["y"] + 50:
+        if button_x <= mouse_x <= button_x + button_width and btn["y"] <= mouse_y <= btn["y"] + 50:
             return btn["action"]
     return None
 
@@ -272,23 +256,19 @@ def get_hovered_button_instructions_menu(mouse_x, mouse_y):
     button_width = 200
     button_x = (road.SCREEN_WIDTH - button_width) / 2
     button_y = 100
-    # Inverte a coordenada Y do mouse para corresponder ao sistema do OpenGL
-    inverted_mouse_y = road.SCREEN_HEIGHT - mouse_y
-    if button_x <= mouse_x <= button_x + button_width and button_y <= inverted_mouse_y <= button_y + 50:
+    if button_x <= mouse_x <= button_x + button_width and button_y <= mouse_y <= button_y + 50:
         return "main"
     return None
 
 def get_hovered_button_game_over_menu(mouse_x, mouse_y):
     button_width = 250
     button_x = (road.SCREEN_WIDTH - button_width) / 2
-    # Inverte a coordenada Y do mouse para corresponder ao sistema do OpenGL
-    inverted_mouse_y = road.SCREEN_HEIGHT - mouse_y
     buttons = [
         {"y": road.SCREEN_HEIGHT / 2 - 50, "action": "restart"},
         {"y": road.SCREEN_HEIGHT / 2 - 120, "action": "main"}
     ]
     for btn in buttons:
-        if button_x <= mouse_x <= button_x + button_width and btn["y"] <= inverted_mouse_y <= btn["y"] + 50:
+        if button_x <= mouse_x <= button_x + button_width and btn["y"] <= mouse_y <= btn["y"] + 50:
             return btn["action"]
     return None
 
@@ -371,7 +351,7 @@ def draw_heart(x, y, size=8, color=(1.0, 0.3, 0.3), filled=True):
         glLineWidth(1.0)
 
 def main():
-    global current_game_state, scroll_pos, player_truck, enemies_up, enemies_down, spawn_timer_up, spawn_timer_down, police_car, holes, hole_spawn_timer, oil_stains, oil_stain_spawn_timer, invulnerability_powerups, invulnerability_spawn_timer, sys, random, last_police_spawn_time
+    global current_game_state, scroll_pos, player_truck, enemies_up, enemies_down, spawn_timer_up, spawn_timer_down, police_car, holes, hole_spawn_timer, oil_stains, oil_stain_spawn_timer, invulnerability_powerups, invulnerability_spawn_timer, sys, random, last_police_spawn_time, current_scale, current_offset, fb_height
 
     if not glfw.init():
         sys.exit("Could not initialize GLFW.")
@@ -424,7 +404,6 @@ def main():
     hole_spawn_timer = 0
     oil_stain_spawn_timer = 0
     invulnerability_spawn_timer = 0
-    spawn_rate = 1000
 
     enemy_up_texture_pairs = list(zip(enemy_textures_up, enemy_dead_textures_up))
     enemy_down_texture_pairs = list(zip(enemy_textures_down, enemy_dead_textures_down))
@@ -432,12 +411,38 @@ def main():
     while not glfw.window_should_close(window):
         glfw.poll_events()
 
-        # --- Sincronizar resolução dinamicamente com road.py ---
-        fb_width, fb_height = glfw.get_framebuffer_size(window)
-        road.SCREEN_WIDTH = fb_width
-        road.SCREEN_HEIGHT = fb_height
-        road.GAME_WIDTH = fb_width - PANEL_WIDTH
-        road.PANEL_WIDTH = PANEL_WIDTH  # Mantém painel lateral fixo
+        # --- Resolution & uniform scaling (logical base coordinates) ---
+        fb_size = glfw.get_framebuffer_size(window)
+        fb_width = fb_size[0]
+        fb_height = fb_size[1]
+
+        # Base logical resolution (use existing imported GAME_WIDTH / PANEL_WIDTH / SCREEN_HEIGHT as reference)
+        BASE_GAME_WIDTH = GAME_WIDTH
+        BASE_PANEL_WIDTH = PANEL_WIDTH
+        BASE_TOTAL_WIDTH = BASE_GAME_WIDTH + BASE_PANEL_WIDTH
+        BASE_HEIGHT = SCREEN_HEIGHT
+
+        # Scale uniformly to fit framebuffer while preserving aspect ratio
+        scale = min(fb_width / float(BASE_TOTAL_WIDTH), fb_height / float(BASE_HEIGHT)) if BASE_TOTAL_WIDTH > 0 and BASE_HEIGHT > 0 else 1.0
+        scaled_width = BASE_TOTAL_WIDTH * scale
+        scaled_height = BASE_HEIGHT * scale
+        offset_x = (fb_width - scaled_width) / 2.0
+        offset_y = (fb_height - scaled_height) / 2.0
+
+        # Integer viewports
+        content_vp = (int(round(offset_x)), int(round(offset_y)), int(round(scaled_width)), int(round(scaled_height)))
+        game_vp = (int(round(offset_x)), int(round(offset_y)), int(round(BASE_GAME_WIDTH * scale)), int(round(scaled_height)))
+        panel_vp = (int(round(offset_x + BASE_GAME_WIDTH * scale)), int(round(offset_y)), int(round(BASE_PANEL_WIDTH * scale)), int(round(scaled_height)))
+
+        # Make road module use logical base coords for layout calculations (keeps helper functions consistent)
+        road.SCREEN_WIDTH = BASE_TOTAL_WIDTH
+        road.SCREEN_HEIGHT = BASE_HEIGHT
+        road.GAME_WIDTH = BASE_GAME_WIDTH
+        road.PANEL_WIDTH = BASE_PANEL_WIDTH
+
+        # Expose values for mouse mapping and other draw code
+        current_scale = scale
+        current_offset = (offset_x, offset_y)
 
         # --- Game State Logic ---
         if current_game_state == GAME_STATE_PLAYING:
@@ -713,16 +718,19 @@ def main():
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
 
         if current_game_state == GAME_STATE_MENU or current_game_state == GAME_STATE_GAME_OVER:
-            # --- Fullscreen Viewport for Menu ---
-            glViewport(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT)
+            # --- Scaled viewport for Menu / Game Over (preserve aspect ratio) ---
+            glViewport(content_vp[0], content_vp[1], content_vp[2], content_vp[3])
             glMatrixMode(GL_PROJECTION)
             glLoadIdentity()
-            gluOrtho2D(0, SCREEN_WIDTH, 0, SCREEN_HEIGHT)
+            gluOrtho2D(0, BASE_TOTAL_WIDTH, 0, BASE_HEIGHT)
             glMatrixMode(GL_MODELVIEW)
             glLoadIdentity()
 
-            mouse_x, mouse_y = glfw.get_cursor_pos(window)
-            mouse_y = SCREEN_HEIGHT - mouse_y  # Adjust mouse Y
+            # Convert mouse pixel coords -> logical base coordinates
+            mouse_px, mouse_py = glfw.get_cursor_pos(window)
+            inv_mouse_py = fb_height - mouse_py
+            mouse_x = (mouse_px - offset_x) / scale
+            mouse_y = (inv_mouse_py - offset_y) / scale
 
             if current_game_state == GAME_STATE_MENU:
                 if menu_state.active_menu == "main":
@@ -743,11 +751,11 @@ def main():
                     draw_game_over_menu(final_score, menu_state, mouse_x, mouse_y, top_scores, new_high_score, player_name)
 
         elif current_game_state == GAME_STATE_PLAYING:
-            # --- Game Viewport ---
-            glViewport(0, 0, GAME_WIDTH, SCREEN_HEIGHT)
+            # --- Game Viewport (scaled) ---
+            glViewport(game_vp[0], game_vp[1], game_vp[2], game_vp[3])
             glMatrixMode(GL_PROJECTION)
             glLoadIdentity()
-            gluOrtho2D(0, GAME_WIDTH, 0, SCREEN_HEIGHT)
+            gluOrtho2D(0, BASE_GAME_WIDTH, 0, BASE_HEIGHT)
             glMatrixMode(GL_MODELVIEW)
             glLoadIdentity()
 
@@ -775,11 +783,11 @@ def main():
             if police_car:
                 police_car.draw()
 
-            # --- Panel Viewport ---
-            glViewport(GAME_WIDTH, 0, PANEL_WIDTH, SCREEN_HEIGHT)
+            # --- Panel Viewport (scaled) ---
+            glViewport(panel_vp[0], panel_vp[1], panel_vp[2], panel_vp[3])
             glMatrixMode(GL_PROJECTION)
             glLoadIdentity()
-            gluOrtho2D(0, PANEL_WIDTH, 0, SCREEN_HEIGHT)
+            gluOrtho2D(0, BASE_PANEL_WIDTH, 0, BASE_HEIGHT)
             glMatrixMode(GL_MODELVIEW)
             glLoadIdentity()
 
