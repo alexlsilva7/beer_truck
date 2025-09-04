@@ -148,7 +148,7 @@ def key_callback(window, key, scancode, action, mods):
     # Buzina: tecla Espaço toca o som, salvo quando digitando o nome
     if key == glfw.KEY_SPACE and action == glfw.PRESS and not asking_for_name:
         try:
-            audio_manager.play_one_shot("assets/sound/horn.mp3")
+            audio_manager.play_one_shot("assets/sound/horn.mp3", volume=0.7)
         except Exception as e:
             print(f"Erro ao tocar buzina: {e}")
 
@@ -218,7 +218,7 @@ def mouse_button_callback(window, button, action, mods):
                         reset_game()
                         # --- Inicia a música de fundo ---
                         try:
-                            audio_manager.play_background_music("assets/sound/background_music_1.mp3", volume=0.8, fade_ms=500, loop=True)
+                            audio_manager.play_background_music("assets/sound/background_music_1.mp3", volume=0.5, fade_ms=500, loop=True)
                         except Exception as e:
                             print(f"Erro ao iniciar a música de fundo: {e}")
                     elif hovered_button == "instructions":
@@ -452,6 +452,8 @@ def main():
         audio_manager.preload_sound("assets/sound/background_music_1.mp3", create_loop=True)
         audio_manager.preload_sound("assets/sound/crash.wav", create_loop=False)
         audio_manager.preload_sound("assets/sound/game_over.wav", create_loop=False)
+        audio_manager.preload_sound("assets/sound/beer.wav", create_loop=False)
+        audio_manager.preload_sound("assets/sound/invulnerability.wav", create_loop=False)
     except Exception as e:
         print(f"Erro ao pré-carregar áudios: {e}")
     
@@ -571,7 +573,7 @@ def main():
                     # Botão para buzina (geralmente o botão 2 é o 'X' no PS2)
                     if joystick.get_button(2):
                         try:
-                            audio_manager.play_one_shot("assets/sound/horn.mp3")
+                            audio_manager.play_one_shot("assets/sound/horn.mp3", volume=0.7)
                         except Exception as e:
                             print(f"Erro ao tocar buzina: {e}")
 
@@ -691,7 +693,7 @@ def main():
                     enemy.crashed = True
                     # Reproduz som de colisão (reutiliza helper para evitar duplicação)
                     try:
-                        audio_manager.play_one_shot("assets/sound/crash.wav")
+                        audio_manager.play_one_shot("assets/sound/crash.wav", volume=0.7)
                     except Exception as e:
                         print(f"Erro ao tocar som de colisão: {e}")
                     # O caminhão só toma dano se não estiver blindado
@@ -817,6 +819,10 @@ def main():
                     # Cerveja é coletada e jogador ganha pontos
                     points_gained = beer.collect()
                     if points_gained > 0:
+                        try:
+                            audio_manager.play_one_shot("assets/sound/beer.wav")
+                        except Exception as e:
+                            print(f"Erro ao tocar som de coleta: {e}")
                         # Cria indicador visual de pontos
                         indicator_x = beer.x + beer.width // 2
                         indicator_y = beer.y
@@ -872,6 +878,10 @@ def main():
                 if powerup.active and player_truck.check_invulnerability_powerup_collision(powerup):
                     # Power-up desaparece após uso
                     powerup.active = False
+                    try:
+                        audio_manager.play_one_shot("assets/sound/invulnerability.wav")
+                    except Exception as e:
+                        print(f"Erro ao tocar som de invulnerabilidade: {e}")
                     # Ativa o efeito de invulnerabilidade e transforma em carro blindado
                     player_truck.activate_invulnerability_powerup()
             

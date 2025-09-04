@@ -46,7 +46,7 @@ class PoliceCar:
 
         if self.sound_path:
             try:
-                self._player = audio_manager.SoundPlayer(self.sound_path, use_loop=sound_loop)
+                self._player = audio_manager.SoundPlayer(self.sound_path, use_loop=sound_loop, volume=0.7)
                 self._player.start()
             except Exception as e:
                 print(f"Failed to start police sound: {e}")

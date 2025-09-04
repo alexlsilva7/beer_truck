@@ -154,10 +154,11 @@ class SoundPlayer:
     O loop é reproduzido até chamar .stop()
     """
 
-    def __init__(self, path, use_loop=True):
+    def __init__(self, path, use_loop=True, volume=None):
         path = _resolve_path(path)
         self.path = path
         self._use_loop = bool(use_loop)
+        self._volume = volume
         self._full = None
         self._loop = None
         self._loop_tmp = None
@@ -249,6 +250,11 @@ class SoundPlayer:
             if self._full:
                 try:
                     ch = self._full.play()
+                    if ch and self._volume is not None:
+                        try:
+                            ch.set_volume(self._volume)
+                        except Exception:
+                            pass
                     with self._audio_lock:
                         self._audio_channel = ch
                     while not self._stop_event.is_set() and self._is_playing_channel(ch):
@@ -443,12 +449,12 @@ def stop_all():
         except Exception:
             pass
 
-def play_one_shot(path):
+def play_one_shot(path, volume=None):
     """Toca um som uma vez (não em loop). Retorna o SoundPlayer ou None em falha.
     Aceita caminho relativo.
     """
     try:
-        player = SoundPlayer(path, use_loop=False)  # SoundPlayer já resolve o caminho
+        player = SoundPlayer(path, use_loop=False, volume=volume)  # SoundPlayer já resolve o caminho
         player.start()
         return player
     except Exception as e:
