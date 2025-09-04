@@ -546,15 +546,6 @@ def main():
                         # Se ainda tem vidas, faz o respawn
                         if player_truck.lives > 0:
                             player_truck.respawn()
-                            # Limpa os inimigos, polícia e obstáculos para dar um novo começo
-                            enemies_up.clear()
-                            enemies_down.clear()
-                            holes.clear()
-                            oil_stains.clear()
-                            invulnerability_powerups.clear()
-                            if police_car:
-                                police_car.stop_audio()
-                                police_car = None
                         else:
                             # Se não tem mais vidas, é Game Over
                             current_game_state = GAME_STATE_GAME_OVER
