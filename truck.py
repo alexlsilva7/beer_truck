@@ -206,18 +206,25 @@ class Truck:
                 abs(truck_center_y - powerup_center_y) < max_y_distance)
 
     def take_damage(self):
-        """O caminhão perde uma vida e fica temporariamente invulnerável."""
+        """O caminhão perde uma vida e inicia a sequência de 'crash'."""
         if not self.invulnerable and self.lives > 0:
             self.lives -= 1
-            self.invulnerable = True
-            self.invulnerable_start_time = time.time()
-            
-            # Se não tem mais vidas, marca como crashed
-            if self.lives <= 0:
-                self.crashed = True
-            
+            # Sempre marca como 'crashed' para iniciar a sequência de limpeza de tela.
+            self.crashed = True
             return True  # Indica que tomou dano
-        return False  # Não tomou dano (já estava invulnerável ou sem vidas)
+        return False  # Não tomou dano (já estava invulnerável)
+
+    def respawn(self):
+        """Reseta a posição e o estado do caminhão para o respawn, concedendo invulnerabilidade."""
+        self.x = (GAME_WIDTH - self.width) / 2
+        self.y = 50
+        self.crashed = False
+        self.invulnerable = True
+        self.invulnerable_start_time = time.time()
+        # Reseta também os efeitos dos obstáculos
+        self.slowed_down = False
+        self.controls_inverted = False
+        self.current_speed_factor = 1.0
         
     def slow_down(self):
         """O caminhão sofre um efeito de diminuição de velocidade."""

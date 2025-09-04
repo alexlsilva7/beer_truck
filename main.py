@@ -507,33 +507,49 @@ def main():
                     dy = scroll_speed / player_truck.speed_y
                 player_truck.move(dx, dy)
             else:
+                # --- LÓGICA DE CRASH / RESPAWN / GAME OVER ---
                 # Empurra o caminhão com o scroll quando está crashado
                 player_truck.y += scroll_speed
-                # Só encerra o jogo quando o caminhão saiu da tela E
+
+                # Só continua para a próxima etapa (respawn ou game over) quando o caminhão saiu da tela E
                 # todos os inimigos marcados como crashados também já tiverem saído.
                 if player_truck.y + player_truck.height < 0:
                     crashed_enemies = [e for e in enemies_up + enemies_down if e.crashed]
                     # considera apenas inimigos que ainda estão visíveis na tela
                     remaining_crashed_visible = [e for e in crashed_enemies if e.y + e.height >= 0]
-                    if not remaining_crashed_visible:
-                        current_game_state = GAME_STATE_GAME_OVER
-                        # Para a música de fundo ao entrar na tela de game over
-                        try:
-                            audio_manager.stop_background_music()
-                        except Exception:
-                            pass
-                        # Toca som de game over (não bloqueante)
-                        try:
-                            audio_manager.play_one_shot("assets/sound/game_over.wav")
-                        except Exception as e:
-                            print(f"Erro ao tocar som de game over: {e}")
-                        # Verifica se a pontuação atual é um novo high score
-                        final_score = int(abs(scroll_pos * 0.1))
-                        global new_high_score, asking_for_name
-                        new_high_score = high_score_manager.is_high_score(final_score)
-                        if new_high_score:
-                            asking_for_name = True
 
+                    if not remaining_crashed_visible:
+                        # Se ainda tem vidas, faz o respawn
+                        if player_truck.lives > 0:
+                            player_truck.respawn()
+                            # Limpa os inimigos, polícia e obstáculos para dar um novo começo
+                            enemies_up.clear()
+                            enemies_down.clear()
+                            holes.clear()
+                            oil_stains.clear()
+                            invulnerability_powerups.clear()
+                            if police_car:
+                                police_car.stop_audio()
+                                police_car = None
+                        else:
+                            # Se não tem mais vidas, é Game Over
+                            current_game_state = GAME_STATE_GAME_OVER
+                            # Para a música de fundo ao entrar na tela de game over
+                            try:
+                                audio_manager.stop_background_music()
+                            except Exception:
+                                pass
+                            # Toca som de game over (não bloqueante)
+                            try:
+                                audio_manager.play_one_shot("assets/sound/game_over.wav")
+                            except Exception as e:
+                                print(f"Erro ao tocar som de game over: {e}")
+                            # Verifica se a pontuação atual é um novo high score
+                            final_score = int(abs(scroll_pos * 0.1))
+                            global new_high_score, asking_for_name
+                            new_high_score = high_score_manager.is_high_score(final_score)
+                            if new_high_score:
+                                asking_for_name = True
             scroll_pos += scroll_speed
 
             # --- Police Spawning ---
