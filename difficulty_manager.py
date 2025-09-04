@@ -10,6 +10,7 @@ class DifficultyManager:
         self.base_hole_spawn_probability = 0.5  # 50% de chance (aumentado ainda mais)
         self.base_oil_stain_spawn_probability = 0.3  # 30% de chance inicial
         self.base_invulnerability_spawn_probability = 0.3  # Aumentado para 30% para facilitar testes
+        self.base_beer_spawn_probability = 0.3  # 30% de chance inicial para cerveja
 
         # Multiplicadores atuais (iniciam em 1.0 = 100%)
         self.scroll_speed_multiplier = 1.0
@@ -18,6 +19,7 @@ class DifficultyManager:
         self.hole_spawn_probability = self.base_hole_spawn_probability
         self.oil_stain_spawn_probability = self.base_oil_stain_spawn_probability
         self.invulnerability_spawn_probability = self.base_invulnerability_spawn_probability
+        self.beer_spawn_probability = self.base_beer_spawn_probability
         
         # Contador para forçar a criação de buracos
         self.hole_spawn_counter = 0
@@ -41,6 +43,7 @@ class DifficultyManager:
         self.max_hole_spawn_probability = 0.5  # Máximo de 50% de chance
         self.max_oil_stain_spawn_probability = 0.4  # Máximo de 40% de chance
         self.max_invulnerability_spawn_probability = 0.8  # Aumentado para 80% para facilitar testes
+        self.max_beer_spawn_probability = 0.8  # Máximo de 80% de chance, igual à invulnerabilidade
 
         # Controles para ajustes manuais
         self.manual_control_enabled = False
@@ -175,6 +178,7 @@ class DifficultyManager:
         self.hole_spawn_probability = self.base_hole_spawn_probability
         self.oil_stain_spawn_probability = self.base_oil_stain_spawn_probability
         self.invulnerability_spawn_probability = self.base_invulnerability_spawn_probability
+        self.beer_spawn_probability = self.base_beer_spawn_probability
         self.hole_spawn_counter = 0
         self.oil_stain_spawn_counter = 0
         self.invulnerability_spawn_counter = 0
@@ -183,6 +187,18 @@ class DifficultyManager:
     def toggle_manual_control(self):
         """Alterna entre controle automático e manual"""
         self.manual_control_enabled = not self.manual_control_enabled
+
+    def adjust_beer_spawn_probability(self, delta):
+        """Ajusta manualmente a probabilidade de spawn de cerveja"""
+        if self.manual_control_enabled:
+            self.beer_spawn_probability = max(0.0, min(
+                self.beer_spawn_probability + delta,
+                self.max_beer_spawn_probability
+            ))
+
+    def get_current_beer_spawn_probability(self):
+        """Retorna a probabilidade atual de spawn de cerveja"""
+        return self.beer_spawn_probability
 
     def get_difficulty_info(self):
         """Retorna informações sobre a dificuldade atual para exibição"""
@@ -193,6 +209,7 @@ class DifficultyManager:
             "hole_spawn_probability": self.hole_spawn_probability,
             "oil_stain_spawn_probability": self.oil_stain_spawn_probability,
             "invulnerability_spawn_probability": self.invulnerability_spawn_probability,
+            "beer_spawn_probability": self.beer_spawn_probability,
             "current_scroll_speed": self.get_current_scroll_speed(),
             "current_spawn_rate": self.get_current_spawn_rate(),
             "manual_control": self.manual_control_enabled

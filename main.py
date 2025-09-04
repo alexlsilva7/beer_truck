@@ -16,7 +16,9 @@ from enemy import Enemy, EnemyDown
 import police
 from hole import Hole
 from oil_stain import OilStain
+from beer_collectible import BeerCollectible
 from invulnerability import InvulnerabilityPowerUp
+from score_indicator import ScoreIndicator
 from texture_loader import load_texture
 from menu import MenuState, draw_start_menu, draw_instructions_screen, draw_game_over_menu, draw_name_input_screen, draw_lives
 from difficulty_manager import DifficultyManager
@@ -99,8 +101,13 @@ holes = []  # Lista para armazenar os buracos na pista
 hole_spawn_timer = 0  # Temporizador para spawn de buracos
 oil_stains = []  # Lista para armazenar as manchas de óleo na pista
 oil_stain_spawn_timer = 0  # Temporizador para spawn de manchas de óleo
+beer_collectibles = []  # Lista para armazenar os objetos de cerveja coletáveis
+beer_spawn_timer = 0  # Temporizador para spawn de cervejas
 invulnerability_powerups = []  # Lista para armazenar os power-ups de invulnerabilidade
 invulnerability_spawn_timer = 0  # Temporizador para spawn de power-ups
+score_indicators = []  # Lista para armazenar os indicadores de pontos
+pending_score_bonus = 0  # Pontos bônus pendentes para aplicação gradual
+beer_bonus_points = 0  # Pontos ganhos com cerveja (separado do scroll_pos)
 
 # --- Callbacks de Input ---
 def key_callback(window, key, scancode, action, mods):
@@ -128,7 +135,7 @@ def key_callback(window, key, scancode, action, mods):
         elif key == glfw.KEY_ENTER:
             # Finaliza a entrada do nome e salva o high score
             if len(player_name) > 0:
-                score = abs(scroll_pos * 0.1)
+                score = abs(scroll_pos * 0.1) + beer_bonus_points
                 high_score_manager.add_high_score(player_name, int(score))
                 asking_for_name = False
         elif 32 <= key <= 126:  # ASCII imprimível (espaço até ~)
@@ -176,6 +183,12 @@ def key_callback(window, key, scancode, action, mods):
             difficulty_manager.adjust_invulnerability_spawn_probability(0.02)
         elif key == glfw.KEY_INSERT:
             difficulty_manager.adjust_invulnerability_spawn_probability(-0.02)
+        elif key == glfw.KEY_B:
+            # Diminuir probabilidade de spawn da cerveja
+            difficulty_manager.adjust_beer_spawn_probability(-0.05)
+        elif key == glfw.KEY_V:
+            # Aumentar probabilidade de spawn da cerveja
+            difficulty_manager.adjust_beer_spawn_probability(0.05)
 
 
 def mouse_button_callback(window, button, action, mods):
@@ -233,7 +246,7 @@ def mouse_button_callback(window, button, action, mods):
                         # Botão confirmar
                         if button_x <= mouse_x <= button_x + button_width and SCREEN_HEIGHT - mouse_y >= button_y and SCREEN_HEIGHT - mouse_y <= button_y + 50:
                             if len(player_name) > 0:
-                                score = abs(scroll_pos * 0.1)
+                                score = abs(scroll_pos * 0.1) + beer_bonus_points
                                 high_score_manager.add_high_score(player_name, int(score))
                                 asking_for_name = False
 
@@ -291,7 +304,7 @@ def get_hovered_button_game_over_menu(mouse_x, mouse_y):
     return None
 
 def reset_game():
-    global scroll_pos, player_truck, enemies_up, enemies_down, spawn_timer_up, spawn_timer_down, player_name, asking_for_name, new_high_score, police_car,  holes, hole_spawn_timer, oil_stains, oil_stain_spawn_timer, invulnerability_powerups, invulnerability_spawn_timer, last_police_spawn_time
+    global scroll_pos, player_truck, enemies_up, enemies_down, spawn_timer_up, spawn_timer_down, player_name, asking_for_name, new_high_score, police_car,  holes, hole_spawn_timer, oil_stains, oil_stain_spawn_timer, beer_collectibles, beer_spawn_timer, invulnerability_powerups, invulnerability_spawn_timer, score_indicators, pending_score_bonus, beer_bonus_points, last_police_spawn_time
     scroll_pos = 0.0
     player_truck.reset()
     enemies_up.clear()
@@ -313,12 +326,17 @@ def reset_game():
     last_police_spawn_time = -9999.0
     holes.clear()
     oil_stains.clear()
+    beer_collectibles.clear()
     invulnerability_powerups.clear()
+    score_indicators.clear()
     spawn_timer_up = 0
     spawn_timer_down = 0
     hole_spawn_timer = 0
     oil_stain_spawn_timer = 0
+    beer_spawn_timer = 0
     invulnerability_spawn_timer = 0
+    pending_score_bonus = 0
+    beer_bonus_points = 0
     difficulty_manager.reset()
     player_name = ""
     asking_for_name = False
@@ -371,7 +389,7 @@ def draw_heart(x, y, size=8, color=(1.0, 0.3, 0.3), filled=True):
         glLineWidth(1.0)
 
 def main():
-    global current_game_state, scroll_pos, player_truck, enemies_up, enemies_down, spawn_timer_up, spawn_timer_down, police_car, holes, hole_spawn_timer, oil_stains, oil_stain_spawn_timer, invulnerability_powerups, invulnerability_spawn_timer, sys, random, last_police_spawn_time, current_scale, current_offset, fb_height
+    global current_game_state, scroll_pos, player_truck, enemies_up, enemies_down, spawn_timer_up, spawn_timer_down, police_car, holes, hole_spawn_timer, oil_stains, oil_stain_spawn_timer, beer_collectibles, beer_spawn_timer, invulnerability_powerups, invulnerability_spawn_timer, score_indicators, pending_score_bonus, beer_bonus_points, sys, random, last_police_spawn_time, current_scale, current_offset, fb_height
 
     if not glfw.init():
         sys.exit("Could not initialize GLFW.")
@@ -405,6 +423,7 @@ def main():
     enemy_dead_textures_down = [load_texture(os.path.join(script_dir, f"assets/veiculos/down_{color}_dead.png")) for color in ["black", "green", "red", "yellow"]]
     hole_texture = load_texture(os.path.join(script_dir, "assets/elementos_de_cenario/buraco.png"))
     oil_texture = load_texture(os.path.join(script_dir, "assets/elementos_de_cenario/mancha_oleo.png"))
+    beer_texture = load_texture(os.path.join(script_dir, "assets/elementos_de_cenario/cerveja.png"))
     invulnerability_texture = load_texture(os.path.join(script_dir, "assets/elementos_de_cenario/invecibilidade asset.png"))
 
     police_textures = {
@@ -422,7 +441,7 @@ def main():
     except Exception as e:
         print(f"Erro ao pré-carregar áudios: {e}")
     
-    if not all([truck_texture, truck_dead_texture, truck_armored_texture, hole_texture, oil_texture, invulnerability_texture] + enemy_textures_up + enemy_textures_down + enemy_dead_textures_up + enemy_dead_textures_down + list(police_textures.values())):
+    if not all([truck_texture, truck_dead_texture, truck_armored_texture, hole_texture, oil_texture, beer_texture, invulnerability_texture] + enemy_textures_up + enemy_textures_down + enemy_dead_textures_up + enemy_dead_textures_down + list(police_textures.values())):
         glfw.terminate()
         sys.exit("Failed to load one or more textures.")
 
@@ -430,11 +449,16 @@ def main():
     enemies_up, enemies_down = [], []
     holes = []
     oil_stains = []
+    beer_collectibles = []
     invulnerability_powerups = []
+    score_indicators = []
     spawn_timer_up, spawn_timer_down = 0, 0
     hole_spawn_timer = 0
     oil_stain_spawn_timer = 0
+    beer_spawn_timer = 0
     invulnerability_spawn_timer = 0
+    pending_score_bonus = 0
+    beer_bonus_points = 0
 
     enemy_up_texture_pairs = list(zip(enemy_textures_up, enemy_dead_textures_up))
     enemy_down_texture_pairs = list(zip(enemy_textures_down, enemy_dead_textures_down))
@@ -482,7 +506,7 @@ def main():
         if current_game_state == GAME_STATE_PLAYING:
             # Atualizar dificuldade baseada no tempo e pontuação
             time_elapsed = glfw.get_time()
-            score = abs(scroll_pos * 0.1)
+            score = abs(scroll_pos * 0.1) + beer_bonus_points
             difficulty_manager.update(time_elapsed, score)
 
             # Obter valores dinâmicos de dificuldade
@@ -545,7 +569,7 @@ def main():
                             except Exception as e:
                                 print(f"Erro ao tocar som de game over: {e}")
                             # Verifica se a pontuação atual é um novo high score
-                            final_score = int(abs(scroll_pos * 0.1))
+                            final_score = int(abs(scroll_pos * 0.1) + beer_bonus_points)
                             global new_high_score, asking_for_name
                             new_high_score = high_score_manager.is_high_score(final_score)
                             if new_high_score:
@@ -714,6 +738,55 @@ def main():
             # Remove manchas que saíram da tela ou foram usadas
             oil_stains = [o for o in oil_stains if o.active and o.y > -o.height]
             
+            # --- Beer Collectible Spawning ---
+            beer_spawn_timer += 0.4  # Incrementa o timer para spawn (um pouco mais lento)
+            beer_spawn_rate = current_spawn_rate * 1.5  # Taxa de spawn mais lenta que buracos e óleo
+            
+            if beer_spawn_timer >= beer_spawn_rate:
+                beer_spawn_timer = 0
+                # Usa a probabilidade do difficulty manager
+                current_beer_probability = difficulty_manager.get_current_beer_spawn_probability()
+                
+                if random.random() < current_beer_probability:
+                    # Pode aparecer em qualquer faixa
+                    all_lanes = range(0, LANE_COUNT_PER_DIRECTION * 2)
+                    # Verifica faixas seguras para não sobrecarregar
+                    safe_lanes = [lane for lane in all_lanes if 
+                                  max((b.y for b in beer_collectibles if b.lane_index == lane), default=0) < SCREEN_HEIGHT - safety_distance]
+                    
+                    # Se não houver faixas seguras, usa todas as faixas
+                    if not safe_lanes:
+                        safe_lanes = all_lanes
+                        
+                    chosen_lane = random.choice(safe_lanes)
+                    beer_collectibles.append(BeerCollectible(beer_texture, lane_index=chosen_lane, speed_multiplier=enemy_speed_multiplier))
+            
+            # --- Beer Collectible Update & Collision ---
+            for beer in beer_collectibles:
+                beer.update(scroll_speed)  # Passa a velocidade atual de rolagem
+                if beer.active and beer.check_collision(player_truck):
+                    # Cerveja é coletada e jogador ganha pontos
+                    points_gained = beer.collect()
+                    if points_gained > 0:
+                        # Cria indicador visual de pontos
+                        indicator_x = beer.x + beer.width // 2
+                        indicator_y = beer.y
+                        score_indicators.append(ScoreIndicator(indicator_x, indicator_y, points_gained))
+                        
+                        # Adiciona pontos ao score de forma mais suave
+                        # Em vez de alterar scroll_pos drasticamente, vamos fazer pequenos incrementos
+                        # que serão aplicados ao longo do tempo
+                        beer_bonus_points += points_gained  # Adiciona diretamente aos pontos de cerveja
+            
+            # Remove cervejas que saíram da tela ou foram coletadas
+            beer_collectibles = [b for b in beer_collectibles if b.active and b.y > -b.height]
+            
+            # --- Score Indicators Update ---
+            for indicator in score_indicators:
+                indicator.update()
+            # Remove indicadores inativos
+            score_indicators = [i for i in score_indicators if i.active]
+            
             # --- Invulnerability Power-Up Spawning ---
             invulnerability_spawn_timer += 0.2  # Incrementa o timer para spawn (mais lento)
             invulnerability_spawn_rate = current_spawn_rate * 2.0  # Taxa de spawn muito mais lenta que outros elementos
@@ -807,7 +880,7 @@ def main():
                 elif menu_state.active_menu == "instructions":
                     draw_instructions_screen(menu_state, mouse_x, mouse_y)
             else:  # GAME_STATE_GAME_OVER
-                final_score = abs(scroll_pos * 0.1)
+                final_score = abs(scroll_pos * 0.1) + beer_bonus_points
                 top_scores = high_score_manager.get_top_scores()
 
                 if asking_for_name:
@@ -835,6 +908,14 @@ def main():
             # Desenha as manchas de óleo
             for oil_stain in oil_stains:
                 oil_stain.draw()
+                
+            # Desenha as cervejas colecionáveis
+            for beer in beer_collectibles:
+                beer.draw()
+                
+            # Desenha os indicadores de pontos
+            for indicator in score_indicators:
+                indicator.draw()
                 
             # Desenha os power-ups de invulnerabilidade
             for powerup in invulnerability_powerups:
@@ -870,7 +951,7 @@ def main():
             else:
                 displayed_speed = base_speed
             
-            score = abs(scroll_pos * 0.1)
+            score = abs(scroll_pos * 0.1) + beer_bonus_points
 
             # Top stats
             draw_text(f"Time: {int(time_elapsed)}", 12, SCREEN_HEIGHT - 28)
@@ -965,6 +1046,14 @@ def main():
             inv_norm = clamp01(inv_prob / max_inv)
             draw_text("Invuln (F12 / Ins)", label_x, y0)
             draw_text(f"{inv_prob:.2f} prob.", label_x, y0 - line_height)
+            y0 -= group_spacing
+
+            # Beer Spawn Probability
+            beer_prob = difficulty_info.get("beer_spawn_probability", 0.0)
+            max_beer = difficulty_manager.max_beer_spawn_probability
+            beer_norm = clamp01(beer_prob / max_beer)
+            draw_text("Cerveja (B / V)", label_x, y0)
+            draw_text(f"{beer_prob:.2f} prob.", label_x, y0 - line_height)
             y0 -= group_spacing
 
             # Mode / ajuda de teclas
