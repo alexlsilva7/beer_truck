@@ -137,8 +137,6 @@ class PoliceCar:
 
         potential_targets = all_enemies + [player_truck]
         for target in potential_targets:
-            if target.crashed:
-                continue
             if self._check_rear_end_collision(target):
                 if target is player_truck:
                     # Se o player estiver invulnerável ou blindado, a polícia fica crashed; sempre toca som e para a sirene
