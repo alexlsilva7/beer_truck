@@ -7,6 +7,7 @@ import sys
 import os
 import random
 import time
+import pygame
 
 from road import draw_road, SCREEN_WIDTH, SCREEN_HEIGHT, GAME_WIDTH, PANEL_WIDTH, COLOR_PANEL, draw_rect, PLAYER_SPEED, \
     ROAD_WIDTH, LANE_COUNT_PER_DIRECTION, LANE_WIDTH
@@ -112,6 +113,7 @@ beer_bonus_points = 0  # Pontos ganhos com cerveja (separado do scroll_pos)
 # --- Callbacks de Input ---
 def key_callback(window, key, scancode, action, mods):
     global current_game_state, difficulty_manager, player_name, asking_for_name, new_high_score
+    print(f"Key event: key={key}, action={action}, mods={mods}")
 
     if key == glfw.KEY_ESCAPE and action == glfw.PRESS:
         if current_game_state == GAME_STATE_PLAYING:
@@ -400,8 +402,20 @@ def main():
     except Exception as e:
         print(f"Aviso: Falha ao inicializar o pygame mixer via audio_manager: {e}")
 
-
     glutInit(sys.argv)
+
+    joystick = None
+    try:
+        pygame.init()
+        pygame.joystick.init()
+        if pygame.joystick.get_count() > 0:
+            joystick = pygame.joystick.Joystick(0)
+            joystick.init()
+            print(f"Controle encontrado: {joystick.get_name()}")
+        else:
+            print("Nenhum controle encontrado. Usando teclado.")
+    except Exception as e:
+        print(f"Erro ao inicializar o controle: {e}")
 
     window = glfw.create_window(SCREEN_WIDTH, SCREEN_HEIGHT, "Beer Truck", None, None)
     if not window:
@@ -523,12 +537,56 @@ def main():
                 player_truck.update()
                 
                 dx, dy = 0.0, 0.0
-                if glfw.get_key(window, glfw.KEY_LEFT) == glfw.PRESS: dx -= 0.1
-                if glfw.get_key(window, glfw.KEY_RIGHT) == glfw.PRESS: dx += 0.1
-                if glfw.get_key(window, glfw.KEY_UP) == glfw.PRESS:
-                    dy = 0.1
-                elif glfw.get_key(window, glfw.KEY_DOWN) == glfw.PRESS:
-                    dy = scroll_speed / player_truck.speed_y
+                DEADZONE = 0.3  # Zona morta para o analógico
+
+                # --- Controle do Joystick ---
+                if joystick:
+                    pygame.event.pump()  # Processa eventos internos do pygame
+
+                    # Eixo X (esquerda/direita) do analógico esquerdo
+                    axis_x = joystick.get_axis(0)
+                    if abs(axis_x) > DEADZONE:
+                        dx = axis_x * 0.1
+
+                    # Eixo Y (cima/baixo) do analógico esquerdo
+                    axis_y = joystick.get_axis(1)
+                    if abs(axis_y) > DEADZONE:
+                        # Pygame considera -1 para cima, então invertemos
+                        if axis_y < 0:  # Para cima
+                            dy = 0.1
+                        else:  # Para baixo (freio)
+                            dy = scroll_speed / player_truck.speed_y
+
+                    # D-Pad (Hat)
+                    if joystick.get_numhats() > 0:
+                        hat_x, hat_y = joystick.get_hat(0)
+                        if hat_x != 0:
+                            dx = hat_x * 0.1
+                        if hat_y != 0:
+                            if hat_y > 0:  # Para cima
+                                dy = 0.1
+                            else:  # Para baixo (freio)
+                                dy = scroll_speed / player_truck.speed_y
+
+                    # Botão para buzina (geralmente o botão 2 é o 'X' no PS2)
+                    if joystick.get_button(2):
+                        try:
+                            audio_manager.play_one_shot("assets/sound/horn.mp3")
+                        except Exception as e:
+                            print(f"Erro ao tocar buzina: {e}")
+
+                # --- Controle do Teclado (Fallback) ---
+                # Se o joystick não moveu o caminhão, verifica o teclado
+                if dx == 0.0:
+                    if glfw.get_key(window, glfw.KEY_LEFT) == glfw.PRESS: dx -= 0.1
+                    if glfw.get_key(window, glfw.KEY_RIGHT) == glfw.PRESS: dx += 0.1
+
+                if dy == 0.0:
+                    if glfw.get_key(window, glfw.KEY_UP) == glfw.PRESS:
+                        dy = 0.1
+                    elif glfw.get_key(window, glfw.KEY_DOWN) == glfw.PRESS:
+                        dy = scroll_speed / player_truck.speed_y
+
                 player_truck.move(dx, dy)
             else:
                 # --- LÓGICA DE CRASH / RESPAWN / GAME OVER ---
