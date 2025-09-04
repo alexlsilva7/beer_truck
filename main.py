@@ -425,6 +425,7 @@ def main():
     oil_texture = load_texture(os.path.join(script_dir, "assets/elementos_de_cenario/mancha_oleo.png"))
     beer_texture = load_texture(os.path.join(script_dir, "assets/elementos_de_cenario/cerveja.png"))
     invulnerability_texture = load_texture(os.path.join(script_dir, "assets/elementos_de_cenario/invecibilidade asset.png"))
+    road_texture = load_texture(os.path.join(script_dir, "assets/elementos_de_cenario/road_texture.png"))
 
     police_textures = {
         'normal_1': load_texture(os.path.join(script_dir, "assets/veiculos/police_1.png")),
@@ -890,7 +891,7 @@ def main():
             glMatrixMode(GL_MODELVIEW)
             glLoadIdentity()
 
-            draw_road(scroll_pos)
+            draw_road(scroll_pos,road_texture)
             
             # Desenha os buracos e manchas primeiro (para ficarem "abaixo" dos carros)
             for hole in holes:

@@ -30,38 +30,35 @@ def draw_rect(x, y, width, height, color):
     glEnd()
 
 
-def draw_road(scroll_offset):
-    """Desenha todos os elementos da estrada."""
+def draw_road(scroll_offset, texture_id):
+    """Desenha a pista usando uma única textura com rolagem."""
 
-    # --- Fundo e Asfalto ---
+    # --- Fundo de Grama (continua igual) ---
     draw_rect(0, 0, GAME_WIDTH, SCREEN_HEIGHT, COLOR_GRASS)
+
+    # --- Pista com Textura ---
     road_x_start = (GAME_WIDTH - ROAD_WIDTH) / 2
-    draw_rect(road_x_start, 0, ROAD_WIDTH, SCREEN_HEIGHT, COLOR_ASPHALT)
 
-    # --- Linhas Contínuas ---
-    line_width = 5
-    draw_rect(road_x_start, 0, line_width, SCREEN_HEIGHT, COLOR_WHITE)
-    draw_rect(road_x_start + ROAD_WIDTH - line_width, 0, line_width, SCREEN_HEIGHT, COLOR_WHITE)
+    glEnable(GL_TEXTURE_2D)
+    glBindTexture(GL_TEXTURE_2D, texture_id)
+    glColor3f(1.0, 1.0, 1.0)
 
-    center_line_gap = 10
-    center_x = GAME_WIDTH / 2
-    draw_rect(center_x - center_line_gap / 2 - line_width, 0, line_width, SCREEN_HEIGHT, COLOR_YELLOW)
-    draw_rect(center_x + center_line_gap / 2, 0, line_width, SCREEN_HEIGHT, COLOR_YELLOW)
+    texture_y_offset = -scroll_offset / SCREEN_HEIGHT
 
-    # --- Linhas Tracejadas das Faixas ---
-    dash_height = 50
-    gap_height = 30
-    total_segment_height = dash_height + gap_height
+    glBegin(GL_QUADS)
+    # Canto inferior esquerdo
+    glTexCoord2f(0.0, 0.0 + texture_y_offset);
+    glVertex2f(road_x_start, 0)
+    # Canto inferior direito
+    glTexCoord2f(1.0, 0.0 + texture_y_offset);
+    glVertex2f(road_x_start + ROAD_WIDTH, 0)
+    # Canto superior direito
+    # A coordenada Y da textura (V) é 1.0 para cobrir a tela inteira.
+    glTexCoord2f(1.0, 1.0 + texture_y_offset);
+    glVertex2f(road_x_start + ROAD_WIDTH, SCREEN_HEIGHT)
+    # Canto superior esquerdo
+    glTexCoord2f(0.0, 1.0 + texture_y_offset);
+    glVertex2f(road_x_start, SCREEN_HEIGHT)
+    glEnd()
 
-    start_y = (scroll_offset % total_segment_height) - total_segment_height
-    num_dashes = SCREEN_HEIGHT // total_segment_height + 2
-
-    for i in range(1, TOTAL_LANES):
-        if i == LANE_COUNT_PER_DIRECTION:
-            continue
-
-        lane_line_x = road_x_start + (i * LANE_WIDTH) - (line_width / 2)
-
-        for j in range(num_dashes):
-            y_pos = start_y + j * total_segment_height
-            draw_rect(lane_line_x, y_pos, line_width, dash_height, COLOR_WHITE)
+    glDisable(GL_TEXTURE_2D)

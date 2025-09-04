@@ -16,6 +16,11 @@ def load_texture(path):
         texture_id = glGenTextures(1)
         glBindTexture(GL_TEXTURE_2D, texture_id)
 
+        # Define o modo de repetição para a textura.
+        # GL_REPEAT faz a textura se repetir quando as coordenadas passam de 1.0
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT) # Repetição horizontal
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT) # Repetição vertical
+
         # Configura os parâmetros da textura para evitar que ela fique borrada
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR)
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR)
