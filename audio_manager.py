@@ -273,6 +273,11 @@ class SoundPlayer:
             if self._loop:
                 try:
                     ch = self._loop.play(loops=-1)
+                    if ch and self._volume is not None:
+                        try:
+                            ch.set_volume(self._volume)
+                        except Exception:
+                            pass
                     with self._audio_lock:
                         self._audio_channel = ch
                     while not self._stop_event.is_set():
@@ -352,6 +357,23 @@ class SoundPlayer:
             return self._is_playing_channel(ch)
         except Exception:
             return False
+
+    def set_volume(self, volume):
+        """Ajusta volume atual e aplica ao canal se estiver tocando."""
+        try:
+            self._volume = volume
+            try:
+                with self._audio_lock:
+                    ch = self._audio_channel
+            except Exception:
+                ch = None
+            if ch and hasattr(ch, "set_volume"):
+                try:
+                    ch.set_volume(volume)
+                except Exception:
+                    pass
+        except Exception:
+            pass
 
 
 # Background music helpers using pygame.mixer.music (streaming, low memory)
@@ -458,8 +480,6 @@ def play_one_shot(path, volume=None):
         player.start()
         return player
     except Exception as e:
-        try:
-            print(f"play_one_shot error: {e}")
-        except Exception:
-            pass
+        # O erro já é logado dentro do SoundPlayer, se ocorrer.
+        # Apenas retornamos None para indicar a falha.
         return None

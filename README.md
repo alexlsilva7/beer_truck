@@ -71,3 +71,43 @@ deactivate
 ## Como executar:
 ```cmd
 python main.py
+
+## Configurações
+
+O jogo utiliza um arquivo `settings.json` para armazenar as configurações do jogador. Este arquivo é criado automaticamente na primeira vez que o jogo é executado e é atualizado em tempo real conforme as opções são alteradas no menu de configurações.
+
+### Estrutura do `settings.json`
+
+O arquivo tem a seguinte estrutura:
+
+```json
+{
+  "version": 1,
+  "audio": {
+    "master": 1.0,
+    "music": 0.5,
+    "sfx": 0.8
+  },
+  "toggles": {
+    "beer": True,
+    "invulnerability": True,
+    "holes": True,
+    "oil": False,
+    "police": True
+  },
+  "joystick": {
+    "selected_guid": "GUID_DO_CONTROLE"
+  }
+}
+```
+
+- **audio**: Contém os níveis de volume.
+  - `master`: Volume geral do jogo.
+  - `music`: Volume da música de fundo.
+  - `sfx`: Volume dos efeitos sonoros.
+- **toggles**: Permite ativar ou desativar elementos do jogo.
+  - `beer`, `invulnerability`, `holes`, `oil`, `police`: Se `false`, o elemento correspondente não aparecerá no jogo.
+- **joystick**: Armazena o controle selecionado.
+  - `selected_guid`: GUID do joystick selecionado.
+
+Se o arquivo `settings.json` for corrompido ou excluído, ele será recriado com os valores padrão na próxima inicialização do jogo.

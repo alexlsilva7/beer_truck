@@ -4,6 +4,7 @@ from road import SCREEN_HEIGHT, ROAD_WIDTH, GAME_WIDTH
 import random
 import threading
 import audio_manager
+import settings_manager
 
 def preload_police_sound(path, create_loop=True):
     return audio_manager.preload_sound(path, create_loop=create_loop)
@@ -46,7 +47,11 @@ class PoliceCar:
 
         if self.sound_path:
             try:
-                self._player = audio_manager.SoundPlayer(self.sound_path, use_loop=sound_loop, volume=0.7)
+                try:
+                    vol = settings_manager.get_effective_sfx_volume("police")
+                except Exception:
+                    vol = 0.7
+                self._player = audio_manager.SoundPlayer(self.sound_path, use_loop=sound_loop, volume=vol)
                 self._player.start()
             except Exception as e:
                 print(f"Failed to start police sound: {e}")

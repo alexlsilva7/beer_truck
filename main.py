@@ -21,10 +21,13 @@ from beer_collectible import BeerCollectible
 from invulnerability import InvulnerabilityPowerUp
 from score_indicator import ScoreIndicator
 from texture_loader import load_texture
-from menu import MenuState, draw_start_menu, draw_instructions_screen, draw_game_over_menu, draw_name_input_screen, draw_lives
+from menu import MenuState, draw_start_menu, draw_instructions_screen, draw_game_over_menu, draw_name_input_screen, \
+    draw_lives
 from difficulty_manager import DifficultyManager
 from high_score_manager import HighScoreManager
 import audio_manager
+import settings_manager
+import settings_menu
 
 # --- Estados do Jogo ---
 GAME_STATE_MENU = 0
@@ -35,6 +38,7 @@ GAME_STATE_GAME_OVER = 2
 is_borderless = False
 _prev_window_pos = (0, 0)
 _prev_window_size = (SCREEN_WIDTH, SCREEN_HEIGHT)
+
 
 def toggle_borderless(window):
     """Alterna entre modo janela normal e borderless fullscreen (com fallbacks seguros)."""
@@ -56,7 +60,6 @@ def toggle_borderless(window):
                                 vm_refresh)
         glfw.set_window_attrib(window, glfw.DECORATED, glfw.TRUE)
         is_borderless = False
-        print("Switched to windowed mode")
     else:
         # Salva estado atual e entra em borderless fullscreen cobrindo o monitor primário
         try:
@@ -68,12 +71,82 @@ def toggle_borderless(window):
 
         monitor_x, monitor_y = glfw.get_monitor_pos(monitor)
         glfw.set_window_monitor(window, monitor,
-                               monitor_x, monitor_y,
-                               vm_width, vm_height,
-                               vm_refresh)
+                                monitor_x, monitor_y,
+                                vm_width, vm_height,
+                                vm_refresh)
         glfw.set_window_attrib(window, glfw.DECORATED, glfw.FALSE)
         is_borderless = True
-        print("Switched to borderless fullscreen")
+
+
+def reload_joystick(selected_guid, selected_index=None):
+    """Re-inicializa pygame.joystick e tenta selecionar joystick por GUID (preferencial),
+    com fallback para índice; retorna Joystick ou None."""
+    try:
+        import pygame
+        try:
+            pygame.joystick.quit()
+            pygame.joystick.init()
+        except Exception:
+            pass
+        js_count = pygame.joystick.get_count()
+        if js_count <= 0:
+            return None
+        chosen = None
+        chosen_index = None
+        # tenta por GUID salvo primeiro (mais robusto)
+        if selected_guid is not None:
+            for i in range(js_count):
+                try:
+                    j = pygame.joystick.Joystick(i)
+                    j.init()
+                    try:
+                        g = j.get_guid()
+                    except Exception:
+                        g = None
+                    if g == selected_guid:
+                        chosen = j
+                        chosen_index = i
+                        break
+                except Exception:
+                    continue
+        # se não achou por GUID, tenta por índice válido
+        if chosen is None and selected_index is not None:
+            try:
+                si = int(selected_index)
+                if 0 <= si < js_count:
+                    j = pygame.joystick.Joystick(si)
+                    j.init()
+                    chosen = j
+                    chosen_index = si
+            except Exception:
+                chosen = None
+        # fallback para primeiro disponível
+        if chosen is None:
+            try:
+                j = pygame.joystick.Joystick(0)
+                j.init()
+                chosen = j
+                chosen_index = 0
+            except Exception:
+                return None
+        # persiste seleção preferencialmente por GUID (se disponível)
+        try:
+            import settings_manager
+            try:
+                guid = None
+                try:
+                    guid = chosen.get_guid()
+                except Exception:
+                    guid = None
+                settings_manager.set_selected_joystick_guid(guid)
+            except Exception:
+                pass
+        except Exception:
+            pass
+        return chosen
+    except Exception:
+        return None
+
 
 # --- Variáveis Globais ---
 scroll_pos = 0.0
@@ -110,10 +183,10 @@ score_indicators = []  # Lista para armazenar os indicadores de pontos
 pending_score_bonus = 0  # Pontos bônus pendentes para aplicação gradual
 beer_bonus_points = 0  # Pontos ganhos com cerveja (separado do scroll_pos)
 
+
 # --- Callbacks de Input ---
 def key_callback(window, key, scancode, action, mods):
     global current_game_state, difficulty_manager, player_name, asking_for_name, new_high_score
-    print(f"Key event: key={key}, action={action}, mods={mods}")
 
     if key == glfw.KEY_ESCAPE and action == glfw.PRESS:
         if current_game_state == GAME_STATE_PLAYING:
@@ -121,7 +194,7 @@ def key_callback(window, key, scancode, action, mods):
             menu_state.active_menu = "main"
             audio_manager.stop_all()
         elif current_game_state == GAME_STATE_MENU:
-            if menu_state.active_menu == "instructions":
+            if menu_state.active_menu in ["instructions", "settings"]:
                 menu_state.active_menu = "main"
             else:
                 glfw.set_window_should_close(window, True)
@@ -148,7 +221,8 @@ def key_callback(window, key, scancode, action, mods):
     # Buzina: tecla Espaço toca o som, salvo quando digitando o nome
     if key == glfw.KEY_SPACE and action == glfw.PRESS and not asking_for_name:
         try:
-            audio_manager.play_one_shot("assets/sound/horn.mp3", volume=0.7)
+            vol = settings_manager.get_effective_sfx_volume("horn")
+            audio_manager.play_one_shot("assets/sound/horn.mp3", volume=vol)
         except Exception as e:
             print(f"Erro ao tocar buzina: {e}")
 
@@ -218,11 +292,15 @@ def mouse_button_callback(window, button, action, mods):
                         reset_game()
                         # --- Inicia a música de fundo ---
                         try:
-                            audio_manager.play_background_music("assets/sound/background_music_1.mp3", volume=0.5, fade_ms=500, loop=True)
+                            vol = settings_manager.get_effective_music_volume()
+                            audio_manager.play_background_music("assets/sound/background_music_1.mp3", volume=vol,
+                                                                fade_ms=500, loop=True)
                         except Exception as e:
                             print(f"Erro ao iniciar a música de fundo: {e}")
                     elif hovered_button == "instructions":
                         menu_state.active_menu = "instructions"
+                    elif hovered_button == "settings":
+                        menu_state.active_menu = "settings"
                     elif hovered_button == "quit":
                         glfw.set_window_should_close(window, True)
                 elif menu_state.active_menu == "instructions":
@@ -263,7 +341,9 @@ def mouse_button_callback(window, button, action, mods):
                         reset_game()
                         # --- Inicia a música de fundo --- # <--- NOVO
                         try:
-                            audio_manager.play_background_music("assets/sound/background_music_1.mp3", volume=0.8, fade_ms=500, loop=True)
+                            vol = settings_manager.get_effective_music_volume()
+                            audio_manager.play_background_music("assets/sound/background_music_1.mp3", volume=vol,
+                                                                fade_ms=500, loop=True)
                         except Exception as e:
                             print(f"Erro ao iniciar a música de fundo: {e}")
                     elif hovered_button == "main":
@@ -271,19 +351,27 @@ def mouse_button_callback(window, button, action, mods):
                         menu_state.active_menu = "main"
                         reset_game()
 
+
 # --- Funções Auxiliares de Menu ---
 def get_hovered_button_main_menu(mouse_x, mouse_y):
+    """Verifica sobre qual botão do menu principal o mouse está."""
     button_width = 250
+    button_height = 50
     button_x = (road.SCREEN_WIDTH - button_width) / 2
+    button_base_y = road.SCREEN_HEIGHT / 2 - 50
+
     buttons = [
-        {"y": road.SCREEN_HEIGHT / 2 - 50, "action": "start"},
-        {"y": road.SCREEN_HEIGHT / 2 - 120, "action": "instructions"},
-        {"y": road.SCREEN_HEIGHT / 2 - 190, "action": "quit"}
+        {"y": button_base_y, "action": "start"},
+        {"y": button_base_y - 70, "action": "instructions"},
+        {"y": button_base_y - 140, "action": "settings"},
+        {"y": button_base_y - 210, "action": "quit"}
     ]
+
     for btn in buttons:
-        if button_x <= mouse_x <= button_x + button_width and btn["y"] <= mouse_y <= btn["y"] + 50:
+        if button_x <= mouse_x <= button_x + button_width and btn["y"] <= mouse_y <= btn["y"] + button_height:
             return btn["action"]
     return None
+
 
 def get_hovered_button_instructions_menu(mouse_x, mouse_y):
     button_width = 200
@@ -292,6 +380,7 @@ def get_hovered_button_instructions_menu(mouse_x, mouse_y):
     if button_x <= mouse_x <= button_x + button_width and button_y <= mouse_y <= button_y + 50:
         return "main"
     return None
+
 
 def get_hovered_button_game_over_menu(mouse_x, mouse_y):
     button_width = 250
@@ -305,8 +394,9 @@ def get_hovered_button_game_over_menu(mouse_x, mouse_y):
             return btn["action"]
     return None
 
+
 def reset_game():
-    global scroll_pos, player_truck, enemies_up, enemies_down, spawn_timer_up, spawn_timer_down, player_name, asking_for_name, new_high_score, police_car,  holes, hole_spawn_timer, oil_stains, oil_stain_spawn_timer, beer_collectibles, beer_spawn_timer, invulnerability_powerups, invulnerability_spawn_timer, score_indicators, pending_score_bonus, beer_bonus_points, last_police_spawn_time
+    global scroll_pos, player_truck, enemies_up, enemies_down, spawn_timer_up, spawn_timer_down, player_name, asking_for_name, new_high_score, police_car, holes, hole_spawn_timer, oil_stains, oil_stain_spawn_timer, beer_collectibles, beer_spawn_timer, invulnerability_powerups, invulnerability_spawn_timer, score_indicators, pending_score_bonus, beer_bonus_points, last_police_spawn_time
     scroll_pos = 0.0
     player_truck.reset()
     enemies_up.clear()
@@ -343,7 +433,7 @@ def reset_game():
     player_name = ""
     asking_for_name = False
     new_high_score = False
-    glfw.set_time(0) # Reseta o tempo
+    glfw.set_time(0)  # Reseta o tempo
 
 
 def draw_text(text, x, y):
@@ -353,42 +443,44 @@ def draw_text(text, x, y):
     for character in text:
         glutBitmapCharacter(GLUT_BITMAP_HELVETICA_18, ord(character))
 
+
 def draw_heart(x, y, size=8, color=(1.0, 0.3, 0.3), filled=True):
     """Desenha um coração usando primitivas geométricas do OpenGL"""
     glDisable(GL_TEXTURE_2D)
     glColor3f(color[0], color[1], color[2])
-    
+
     import math
-    
+
     if filled:
         # Coração preenchido usando uma abordagem mais precisa
         glBegin(GL_TRIANGLE_FAN)
         glVertex2f(x, y)  # Centro
-        
+
         # Criar pontos do coração usando a equação paramétrica
         for i in range(37):  # 36 pontos + volta ao início
             t = i * 2 * math.pi / 36
             # Equação paramétrica do coração
-            heart_x = x + size * (16 * math.sin(t)**3) / 16
-            heart_y = y + size * (13 * math.cos(t) - 5 * math.cos(2*t) - 2 * math.cos(3*t) - math.cos(4*t)) / 13
+            heart_x = x + size * (16 * math.sin(t) ** 3) / 16
+            heart_y = y + size * (13 * math.cos(t) - 5 * math.cos(2 * t) - 2 * math.cos(3 * t) - math.cos(4 * t)) / 13
             glVertex2f(heart_x, heart_y)
-        
+
         glEnd()
     else:
         # Coração vazado (apenas contorno)
         glLineWidth(2.0)
         glBegin(GL_LINE_LOOP)
-        
+
         # Criar pontos do contorno do coração
         for i in range(36):
             t = i * 2 * math.pi / 36
             # Equação paramétrica do coração
-            heart_x = x + size * (16 * math.sin(t)**3) / 16
-            heart_y = y + size * (13 * math.cos(t) - 5 * math.cos(2*t) - 2 * math.cos(3*t) - math.cos(4*t)) / 13
+            heart_x = x + size * (16 * math.sin(t) ** 3) / 16
+            heart_y = y + size * (13 * math.cos(t) - 5 * math.cos(2 * t) - 2 * math.cos(3 * t) - math.cos(4 * t)) / 13
             glVertex2f(heart_x, heart_y)
-        
+
         glEnd()
         glLineWidth(1.0)
+
 
 def main():
     global current_game_state, scroll_pos, player_truck, enemies_up, enemies_down, spawn_timer_up, spawn_timer_down, police_car, holes, hole_spawn_timer, oil_stains, oil_stain_spawn_timer, beer_collectibles, beer_spawn_timer, invulnerability_powerups, invulnerability_spawn_timer, score_indicators, pending_score_bonus, beer_bonus_points, sys, random, last_police_spawn_time, current_scale, current_offset, fb_height
@@ -398,20 +490,81 @@ def main():
 
     # Inicialização do mixer delegada ao audio_manager (tenta inicializar de forma segura)
     try:
+        # Carrega configurações (fallbacks e defaults já tratados pelo settings_manager)
+        settings_manager.load_settings()
         audio_manager._ensure_mixer_initialized()
+        # Aplica volumes iniciais (se o mixer estiver pronto)
+        try:
+            settings_manager.apply_to_audio_manager(audio_manager)
+        except Exception:
+            pass
     except Exception as e:
         print(f"Aviso: Falha ao inicializar o pygame mixer via audio_manager: {e}")
 
     glutInit(sys.argv)
 
     joystick = None
+    # Tenta usar seleção salva (por nome ou índice) via settings_manager
     try:
         pygame.init()
         pygame.joystick.init()
-        if pygame.joystick.get_count() > 0:
-            joystick = pygame.joystick.Joystick(0)
-            joystick.init()
-            print(f"Controle encontrado: {joystick.get_name()}")
+        js_count = pygame.joystick.get_count()
+        if js_count > 0:
+            sel = settings_manager.get_selected_joystick()
+            sel_guid = sel.get("selected_guid")
+            sel_index = sel.get("selected_index")
+            chosen = None
+            chosen_index = None
+            # Tenta localizar por GUID salvo primeiro (prioritário)
+            if sel_guid is not None:
+                for i in range(js_count):
+                    try:
+                        jtmp = pygame.joystick.Joystick(i)
+                        jtmp.init()
+                        try:
+                            g = jtmp.get_guid()
+                        except Exception:
+                            g = None
+                        if g == sel_guid:
+                            chosen = jtmp
+                            chosen_index = i
+                            break
+                    except Exception:
+                        continue
+            # Se não achou por GUID, tenta por índice (compatibilidade com versões antigas)
+            if chosen is None and sel_index is not None:
+                try:
+                    si = int(sel_index)
+                    if 0 <= si < js_count:
+                        jtmp = pygame.joystick.Joystick(si)
+                        jtmp.init()
+                        chosen = jtmp
+                        chosen_index = si
+                except Exception:
+                    chosen = None
+            # Fallback para primeiro joystick disponível
+            if chosen is None:
+                try:
+                    jtmp = pygame.joystick.Joystick(0)
+                    jtmp.init()
+                    chosen = jtmp
+                    chosen_index = 0
+                except Exception:
+                    chosen = None
+            if chosen:
+                joystick = chosen
+                # Salva seleção por GUID (se disponível)
+                try:
+                    try:
+                        guid = joystick.get_guid()
+                    except Exception:
+                        guid = None
+                    settings_manager.set_selected_joystick_guid(guid)
+                except Exception:
+                    pass
+                print(f"Controle selecionado: {joystick.get_name()} (index {chosen_index})")
+            else:
+                print("Nenhum controle inicializado corretamente. Usando teclado.")
         else:
             print("Nenhum controle encontrado. Usando teclado.")
     except Exception as e:
@@ -431,21 +584,26 @@ def main():
     truck_texture = load_texture(os.path.join(script_dir, "assets/veiculos/protagonista/truck.png"))
     truck_dead_texture = load_texture(os.path.join(script_dir, "assets/veiculos/protagonista/truck_dead.png"))
     truck_armored_texture = load_texture(os.path.join(script_dir, "assets/veiculos/protagonista/armored_truck.png"))
-    enemy_textures_up = [load_texture(os.path.join(script_dir, f"assets/veiculos/up_{color}.png")) for color in ["black", "green", "red", "yellow"]]
-    enemy_textures_down = [load_texture(os.path.join(script_dir, f"assets/veiculos/down_{color}.png")) for color in ["black", "green", "red", "yellow"]]
-    enemy_dead_textures_up = [load_texture(os.path.join(script_dir, f"assets/veiculos/up_{color}_dead.png")) for color in ["black", "green", "red", "yellow"]]
-    enemy_dead_textures_down = [load_texture(os.path.join(script_dir, f"assets/veiculos/down_{color}_dead.png")) for color in ["black", "green", "red", "yellow"]]
+    enemy_textures_up = [load_texture(os.path.join(script_dir, f"assets/veiculos/up_{color}.png")) for color in
+                         ["black", "green", "red", "yellow"]]
+    enemy_textures_down = [load_texture(os.path.join(script_dir, f"assets/veiculos/down_{color}.png")) for color in
+                           ["black", "green", "red", "yellow"]]
+    enemy_dead_textures_up = [load_texture(os.path.join(script_dir, f"assets/veiculos/up_{color}_dead.png")) for color
+                              in ["black", "green", "red", "yellow"]]
+    enemy_dead_textures_down = [load_texture(os.path.join(script_dir, f"assets/veiculos/down_{color}_dead.png")) for
+                                color in ["black", "green", "red", "yellow"]]
     hole_texture = load_texture(os.path.join(script_dir, "assets/elementos_de_cenario/buraco.png"))
     oil_texture = load_texture(os.path.join(script_dir, "assets/elementos_de_cenario/mancha_oleo.png"))
     beer_texture = load_texture(os.path.join(script_dir, "assets/elementos_de_cenario/cerveja.png"))
-    invulnerability_texture = load_texture(os.path.join(script_dir, "assets/elementos_de_cenario/invecibilidade asset.png"))
+    invulnerability_texture = load_texture(
+        os.path.join(script_dir, "assets/elementos_de_cenario/invecibilidade asset.png"))
 
     police_textures = {
         'normal_1': load_texture(os.path.join(script_dir, "assets/veiculos/police_1.png")),
         'normal_2': load_texture(os.path.join(script_dir, "assets/veiculos/police_2.png")),
         'dead': load_texture(os.path.join(script_dir, "assets/veiculos/police_dead.png"))
     }
-    
+
     # --- Pré-carrega os sons ---
     try:
         audio_manager.preload_sound("assets/sound/police_sound.wav", create_loop=True)
@@ -456,8 +614,10 @@ def main():
         audio_manager.preload_sound("assets/sound/invulnerability.wav", create_loop=False)
     except Exception as e:
         print(f"Erro ao pré-carregar áudios: {e}")
-    
-    if not all([truck_texture, truck_dead_texture, truck_armored_texture, hole_texture, oil_texture, beer_texture, invulnerability_texture] + enemy_textures_up + enemy_textures_down + enemy_dead_textures_up + enemy_dead_textures_down + list(police_textures.values())):
+
+    if not all([truck_texture, truck_dead_texture, truck_armored_texture, hole_texture, oil_texture, beer_texture,
+                invulnerability_texture] + enemy_textures_up + enemy_textures_down + enemy_dead_textures_up + enemy_dead_textures_down + list(
+            police_textures.values())):
         glfw.terminate()
         sys.exit("Failed to load one or more textures.")
 
@@ -494,7 +654,8 @@ def main():
         BASE_HEIGHT = SCREEN_HEIGHT
 
         # Scale uniformly to fit framebuffer while preserving aspect ratio
-        scale = min(fb_width / float(BASE_TOTAL_WIDTH), fb_height / float(BASE_HEIGHT)) if BASE_TOTAL_WIDTH > 0 and BASE_HEIGHT > 0 else 1.0
+        scale = min(fb_width / float(BASE_TOTAL_WIDTH),
+                    fb_height / float(BASE_HEIGHT)) if BASE_TOTAL_WIDTH > 0 and BASE_HEIGHT > 0 else 1.0
         # Prevent zero or negative scale (can happen when framebuffer width/height is 0 e.g. minimized window)
         if not scale or scale <= 0.0:
             scale = 1e-6
@@ -505,8 +666,10 @@ def main():
 
         # Integer viewports
         content_vp = (int(round(offset_x)), int(round(offset_y)), int(round(scaled_width)), int(round(scaled_height)))
-        game_vp = (int(round(offset_x)), int(round(offset_y)), int(round(BASE_GAME_WIDTH * scale)), int(round(scaled_height)))
-        panel_vp = (int(round(offset_x + BASE_GAME_WIDTH * scale)), int(round(offset_y)), int(round(BASE_PANEL_WIDTH * scale)), int(round(scaled_height)))
+        game_vp = (int(round(offset_x)), int(round(offset_y)), int(round(BASE_GAME_WIDTH * scale)),
+                   int(round(scaled_height)))
+        panel_vp = (int(round(offset_x + BASE_GAME_WIDTH * scale)), int(round(offset_y)),
+                    int(round(BASE_PANEL_WIDTH * scale)), int(round(scaled_height)))
 
         # Make road module use logical base coords for layout calculations (keeps helper functions consistent)
         road.SCREEN_WIDTH = BASE_TOTAL_WIDTH
@@ -537,7 +700,7 @@ def main():
             if not player_truck.crashed:
                 # Atualiza o estado do caminhão (verifica invulnerabilidade)
                 player_truck.update()
-                
+
                 dx, dy = 0.0, 0.0
                 DEADZONE = 0.3  # Zona morta para o analógico
 
@@ -573,7 +736,8 @@ def main():
                     # Botão para buzina (geralmente o botão 2 é o 'X' no PS2)
                     if joystick.get_button(2):
                         try:
-                            audio_manager.play_one_shot("assets/sound/horn.mp3", volume=0.7)
+                            vol = settings_manager.get_effective_sfx_volume("horn")
+                            audio_manager.play_one_shot("assets/sound/horn.mp3", volume=vol)
                         except Exception as e:
                             print(f"Erro ao tocar buzina: {e}")
 
@@ -616,7 +780,8 @@ def main():
                                 pass
                             # Toca som de game over (não bloqueante)
                             try:
-                                audio_manager.play_one_shot("assets/sound/game_over.wav")
+                                vol = settings_manager.get_effective_sfx_volume("game_over")
+                                audio_manager.play_one_shot("assets/sound/game_over.wav", volume=vol)
                             except Exception as e:
                                 print(f"Erro ao tocar som de game over: {e}")
                             # Verifica se a pontuação atual é um novo high score
@@ -628,22 +793,18 @@ def main():
             scroll_pos += scroll_speed
 
             # --- Police Spawning ---
-            if police_car is None and score > POLICE_SPAWN_SCORE_THRESHOLD:
+            if police_car is None and score > POLICE_SPAWN_SCORE_THRESHOLD and settings_manager.get_toggle("police"):
                 # Respeita cooldown entre spawns de polícia
                 current_time = glfw.get_time()
                 time_since_last = current_time - last_police_spawn_time
-                if time_since_last < POLICE_COOLDOWN_SECONDS:
-                    # Ainda em cooldown — não tenta spawnar
-                    pass
-                else:
+                if time_since_last >= POLICE_COOLDOWN_SECONDS:
                     # A chance aumenta com a pontuação
                     spawn_chance = random.uniform(0, 1) * (score / 500000.0)
                     if random.random() < spawn_chance:
-                        print(f"Police spawn chance: {spawn_chance:.4f}")
-                        print(f"Police car spawned at score {score:.0f}!")
                         # Medir tempo de inicialização para diagnosticar travamentos ao spawn
                         try:
-                            police_car = police.PoliceCar(police_textures, os.path.join(script_dir, "assets/sound/police_sound.wav"))
+                            police_car = police.PoliceCar(police_textures,
+                                                          os.path.join(script_dir, "assets/sound/police_sound.wav"))
                             # Registra o tempo do spawn para aplicar cooldown
                             last_police_spawn_time = glfw.get_time()
                         except Exception as e:
@@ -667,21 +828,26 @@ def main():
             if spawn_timer_up >= current_spawn_rate:
                 spawn_timer_up = 0
                 up_lanes = range(LANE_COUNT_PER_DIRECTION, LANE_COUNT_PER_DIRECTION * 2)
-                possible_lanes = [lane for lane in up_lanes if max((e.y for e in enemies_up if e.lane_index == lane), default=0) < SCREEN_HEIGHT - safety_distance]
+                possible_lanes = [lane for lane in up_lanes if max((e.y for e in enemies_up if e.lane_index == lane),
+                                                                   default=0) < SCREEN_HEIGHT - safety_distance]
                 if possible_lanes:
                     chosen_lane = random.choice(possible_lanes)
                     normal_texture, dead_texture = random.choice(enemy_up_texture_pairs)
-                    enemies_up.append(Enemy(normal_texture, dead_texture, lane_index=chosen_lane, speed_multiplier=enemy_speed_multiplier))
+                    enemies_up.append(Enemy(normal_texture, dead_texture, lane_index=chosen_lane,
+                                            speed_multiplier=enemy_speed_multiplier))
 
             spawn_timer_down += 0.15
             if spawn_timer_down >= current_spawn_rate:
                 spawn_timer_down = 0
                 down_lanes = range(0, LANE_COUNT_PER_DIRECTION)
-                possible_lanes = [lane for lane in down_lanes if max((e.y for e in enemies_down if e.lane_index == lane), default=0) < SCREEN_HEIGHT - safety_distance]
+                possible_lanes = [lane for lane in down_lanes if
+                                  max((e.y for e in enemies_down if e.lane_index == lane),
+                                      default=0) < SCREEN_HEIGHT - safety_distance]
                 if possible_lanes:
                     chosen_lane = random.choice(possible_lanes)
                     normal_texture, dead_texture = random.choice(enemy_down_texture_pairs)
-                    enemies_down.append(EnemyDown(normal_texture, dead_texture, lane_index=chosen_lane, speed_multiplier=enemy_speed_multiplier))
+                    enemies_down.append(EnemyDown(normal_texture, dead_texture, lane_index=chosen_lane,
+                                                  speed_multiplier=enemy_speed_multiplier))
 
             # --- Enemy Update & Collision ---
             all_enemies = enemies_up + enemies_down
@@ -693,48 +859,51 @@ def main():
                     enemy.crashed = True
                     # Reproduz som de colisão (reutiliza helper para evitar duplicação)
                     try:
-                        audio_manager.play_one_shot("assets/sound/crash.wav", volume=0.7)
+                        vol = settings_manager.get_effective_sfx_volume("crash")
+                        audio_manager.play_one_shot("assets/sound/crash.wav", volume=vol)
                     except Exception as e:
                         print(f"Erro ao tocar som de colisão: {e}")
                     # O caminhão só toma dano se não estiver blindado
                     if not player_truck.armored:
                         player_truck.take_damage()
-                
+
                 # inimigos crashados continuam sendo empurrados pelo scroll
                 if enemy.crashed:
                     enemy.y += scroll_speed
-                    
+
             # --- Hole Spawning ---
             hole_spawn_timer += 0.3  # Aumentado para incrementar mais rapidamente o timer
             hole_spawn_rate = current_spawn_rate * 0.5  # Reduzido drasticamente para buracos aparecerem muito mais frequentemente
             current_hole_probability = difficulty_manager.get_current_hole_spawn_probability()
-            
-            if hole_spawn_timer >= hole_spawn_rate:
+
+            if hole_spawn_timer >= hole_spawn_rate and settings_manager.get_toggle("holes"):
                 hole_spawn_timer = 0
                 # Verificação de probabilidade (com probabilidade garantida a cada X tentativas)
                 # Isso garante que um buraco vai aparecer eventualmente
                 static_spawn_counter = getattr(difficulty_manager, 'hole_spawn_counter', 0) + 1
                 difficulty_manager.hole_spawn_counter = static_spawn_counter
-                
+
                 # Força o spawn a cada 5 tentativas, independente da probabilidade
                 force_spawn = (static_spawn_counter >= 5)
                 if force_spawn:
                     difficulty_manager.hole_spawn_counter = 0
-                
+
                 if force_spawn or random.random() < current_hole_probability:
                     # Pode aparecer em qualquer faixa
                     all_lanes = range(0, LANE_COUNT_PER_DIRECTION * 2)
                     # Relaxamos a restrição de segurança para permitir mais buracos
-                    safe_lanes = [lane for lane in all_lanes if 
-                                  max((h.y for h in holes if h.lane_index == lane), default=0) < SCREEN_HEIGHT - safety_distance/2]
-                    
+                    safe_lanes = [lane for lane in all_lanes if
+                                  max((h.y for h in holes if h.lane_index == lane),
+                                      default=0) < SCREEN_HEIGHT - safety_distance / 2]
+
                     # Se não houver faixas seguras, usa todas as faixas
                     if not safe_lanes:
                         safe_lanes = all_lanes
-                        
+
                     chosen_lane = random.choice(safe_lanes)
-                    holes.append(Hole(hole_texture, lane_index=chosen_lane, speed_multiplier=enemy_speed_multiplier))
-            
+                    holes.append(
+                        Hole(hole_texture, lane_index=chosen_lane, speed_multiplier=enemy_speed_multiplier))
+
             # --- Hole Update & Collision ---
             for hole in holes:
                 hole.update(scroll_speed)  # Passa a velocidade atual de rolagem
@@ -743,40 +912,42 @@ def main():
                     hole.active = False
                     # Aplica efeito de diminuição de velocidade
                     player_truck.slow_down()
-            
+
             # Remove buracos que saíram da tela ou foram usados
             holes = [h for h in holes if h.active and h.y > -h.height]
-            
+
             # --- Oil Stain Spawning ---
             oil_stain_spawn_timer += 0.3  # Incrementa o timer para spawn
             oil_stain_spawn_rate = current_spawn_rate * 0.6  # Taxa de spawn um pouco mais lenta que os buracos
             current_oil_stain_probability = difficulty_manager.get_current_oil_stain_spawn_probability()
-            
-            if oil_stain_spawn_timer >= oil_stain_spawn_rate:
+
+            if oil_stain_spawn_timer >= oil_stain_spawn_rate and settings_manager.get_toggle("oil"):
                 oil_stain_spawn_timer = 0
                 # Verificação de probabilidade (com probabilidade garantida a cada X tentativas)
                 static_spawn_counter = getattr(difficulty_manager, 'oil_stain_spawn_counter', 0) + 1
                 difficulty_manager.oil_stain_spawn_counter = static_spawn_counter
-                
+
                 # Força o spawn a cada 7 tentativas, independente da probabilidade
                 force_spawn = (static_spawn_counter >= 7)
                 if force_spawn:
                     difficulty_manager.oil_stain_spawn_counter = 0
-                
+
                 if force_spawn or random.random() < current_oil_stain_probability:
                     # Pode aparecer em qualquer faixa
                     all_lanes = range(0, LANE_COUNT_PER_DIRECTION * 2)
                     # Relaxamos a restrição de segurança para permitir mais manchas
-                    safe_lanes = [lane for lane in all_lanes if 
-                                  max((o.y for o in oil_stains if o.lane_index == lane), default=0) < SCREEN_HEIGHT - safety_distance/2]
-                    
+                    safe_lanes = [lane for lane in all_lanes if
+                                  max((o.y for o in oil_stains if o.lane_index == lane),
+                                      default=0) < SCREEN_HEIGHT - safety_distance / 2]
+
                     # Se não houver faixas seguras, usa todas as faixas
                     if not safe_lanes:
                         safe_lanes = all_lanes
-                        
+
                     chosen_lane = random.choice(safe_lanes)
-                    oil_stains.append(OilStain(oil_texture, lane_index=chosen_lane, speed_multiplier=enemy_speed_multiplier))
-            
+                    oil_stains.append(
+                        OilStain(oil_texture, lane_index=chosen_lane, speed_multiplier=enemy_speed_multiplier))
+
             # --- Oil Stain Update & Collision ---
             for oil_stain in oil_stains:
                 oil_stain.update(scroll_speed)  # Passa a velocidade atual de rolagem
@@ -785,33 +956,35 @@ def main():
                     oil_stain.active = False
                     # Aplica efeito de inversão de controles
                     player_truck.invert_controls()
-            
+
             # Remove manchas que saíram da tela ou foram usadas
             oil_stains = [o for o in oil_stains if o.active and o.y > -o.height]
-            
+
             # --- Beer Collectible Spawning ---
             beer_spawn_timer += 0.4  # Incrementa o timer para spawn (um pouco mais lento)
             beer_spawn_rate = current_spawn_rate * 1.5  # Taxa de spawn mais lenta que buracos e óleo
-            
-            if beer_spawn_timer >= beer_spawn_rate:
+
+            if beer_spawn_timer >= beer_spawn_rate and settings_manager.get_toggle("beer"):
                 beer_spawn_timer = 0
                 # Usa a probabilidade do difficulty manager
                 current_beer_probability = difficulty_manager.get_current_beer_spawn_probability()
-                
+
                 if random.random() < current_beer_probability:
                     # Pode aparecer em qualquer faixa
                     all_lanes = range(0, LANE_COUNT_PER_DIRECTION * 2)
                     # Verifica faixas seguras para não sobrecarregar
-                    safe_lanes = [lane for lane in all_lanes if 
-                                  max((b.y for b in beer_collectibles if b.lane_index == lane), default=0) < SCREEN_HEIGHT - safety_distance]
-                    
+                    safe_lanes = [lane for lane in all_lanes if
+                                  max((b.y for b in beer_collectibles if b.lane_index == lane),
+                                      default=0) < SCREEN_HEIGHT - safety_distance]
+
                     # Se não houver faixas seguras, usa todas as faixas
                     if not safe_lanes:
                         safe_lanes = all_lanes
-                        
+
                     chosen_lane = random.choice(safe_lanes)
-                    beer_collectibles.append(BeerCollectible(beer_texture, lane_index=chosen_lane, speed_multiplier=enemy_speed_multiplier))
-            
+                    beer_collectibles.append(BeerCollectible(beer_texture, lane_index=chosen_lane,
+                                                             speed_multiplier=enemy_speed_multiplier))
+
             # --- Beer Collectible Update & Collision ---
             for beer in beer_collectibles:
                 beer.update(scroll_speed)  # Passa a velocidade atual de rolagem
@@ -820,58 +993,62 @@ def main():
                     points_gained = beer.collect()
                     if points_gained > 0:
                         try:
-                            audio_manager.play_one_shot("assets/sound/beer.wav")
+                            vol = settings_manager.get_effective_sfx_volume("beer")
+                            audio_manager.play_one_shot("assets/sound/beer.wav", volume=vol)
                         except Exception as e:
                             print(f"Erro ao tocar som de coleta: {e}")
                         # Cria indicador visual de pontos
                         indicator_x = beer.x + beer.width // 2
                         indicator_y = beer.y
                         score_indicators.append(ScoreIndicator(indicator_x, indicator_y, points_gained))
-                        
+
                         # Adiciona pontos ao score de forma mais suave
                         # Em vez de alterar scroll_pos drasticamente, vamos fazer pequenos incrementos
                         # que serão aplicados ao longo do tempo
                         beer_bonus_points += points_gained  # Adiciona diretamente aos pontos de cerveja
-            
+
             # Remove cervejas que saíram da tela ou foram coletadas
             beer_collectibles = [b for b in beer_collectibles if b.active and b.y > -b.height]
-            
+
             # --- Score Indicators Update ---
             for indicator in score_indicators:
                 indicator.update()
             # Remove indicadores inativos
             score_indicators = [i for i in score_indicators if i.active]
-            
+
             # --- Invulnerability Power-Up Spawning ---
             invulnerability_spawn_timer += 0.2  # Incrementa o timer para spawn (mais lento)
             invulnerability_spawn_rate = current_spawn_rate * 2.0  # Taxa de spawn muito mais lenta que outros elementos
             current_invulnerability_probability = difficulty_manager.get_current_invulnerability_spawn_probability()
-            
-            if invulnerability_spawn_timer >= invulnerability_spawn_rate:
+
+            if invulnerability_spawn_timer >= invulnerability_spawn_rate and settings_manager.get_toggle("invulnerability"):
                 invulnerability_spawn_timer = 0
                 # Verificação de probabilidade (com probabilidade garantida a cada X tentativas)
                 static_spawn_counter = getattr(difficulty_manager, 'invulnerability_spawn_counter', 0) + 1
                 difficulty_manager.invulnerability_spawn_counter = static_spawn_counter
-                
+
                 # Força o spawn a cada 5 tentativas, independente da probabilidade (mais frequente para testes)
                 force_spawn = (static_spawn_counter >= 5)
                 if force_spawn:
                     difficulty_manager.invulnerability_spawn_counter = 0
-                
+
                 if force_spawn or random.random() < current_invulnerability_probability:
                     # Pode aparecer em qualquer faixa
                     all_lanes = range(0, LANE_COUNT_PER_DIRECTION * 2)
                     # Verifica se há faixas seguras (sem outros power-ups muito próximos)
-                    safe_lanes = [lane for lane in all_lanes if 
-                                  max((p.y for p in invulnerability_powerups if p.lane_index == lane), default=0) < SCREEN_HEIGHT - safety_distance]
-                    
+                    safe_lanes = [lane for lane in all_lanes if
+                                  max((p.y for p in invulnerability_powerups if p.lane_index == lane),
+                                      default=0) < SCREEN_HEIGHT - safety_distance]
+
                     # Se não houver faixas seguras, usa todas as faixas
                     if not safe_lanes:
                         safe_lanes = all_lanes
-                        
+
                     chosen_lane = random.choice(safe_lanes)
-                    invulnerability_powerups.append(InvulnerabilityPowerUp(invulnerability_texture, lane_index=chosen_lane, speed_multiplier=enemy_speed_multiplier))
-            
+                    invulnerability_powerups.append(
+                        InvulnerabilityPowerUp(invulnerability_texture, lane_index=chosen_lane,
+                                               speed_multiplier=enemy_speed_multiplier))
+
             # --- Invulnerability Power-Up Update & Collision ---
             for powerup in invulnerability_powerups:
                 powerup.update(scroll_speed)  # Passa a velocidade atual de rolagem
@@ -879,12 +1056,13 @@ def main():
                     # Power-up desaparece após uso
                     powerup.active = False
                     try:
-                        audio_manager.play_one_shot("assets/sound/invulnerability.wav")
+                        vol = settings_manager.get_effective_sfx_volume("invulnerability")
+                        audio_manager.play_one_shot("assets/sound/invulnerability.wav", volume=vol)
                     except Exception as e:
                         print(f"Erro ao tocar som de invulnerabilidade: {e}")
                     # Ativa o efeito de invulnerabilidade e transforma em carro blindado
                     player_truck.activate_invulnerability_powerup()
-            
+
             # Remove power-ups que saíram da tela ou foram usados
             invulnerability_powerups = [p for p in invulnerability_powerups if p.active and p.y > -p.height]
 
@@ -935,9 +1113,33 @@ def main():
                 if menu_state.active_menu == "main":
                     # Obtém todos os recordes para exibir o top 3
                     top_scores = high_score_manager.get_top_scores()
-                    draw_start_menu(menu_state, mouse_x, mouse_y, {"scores": top_scores, "highest": high_score_manager.get_highest_score()})
+                    draw_start_menu(menu_state, mouse_x, mouse_y,
+                                    {"scores": top_scores, "highest": high_score_manager.get_highest_score()})
                 elif menu_state.active_menu == "instructions":
                     draw_instructions_screen(menu_state, mouse_x, mouse_y)
+                elif menu_state.active_menu == "settings":
+                    try:
+                        action = settings_menu.draw_settings_menu(menu_state, mouse_x, mouse_y, fb_height,
+                                                                  current_offset[0] if current_offset else 0,
+                                                                  current_offset[1] if current_offset else 0,
+                                                                  current_scale)
+                        if action == "back":
+                            menu_state.active_menu = "main"
+                            # Aplicar alterações de áudio e persistir (settings_manager já salva em cada set)
+                            try:
+                                settings_manager.apply_to_audio_manager(audio_manager)
+                            except Exception:
+                                pass
+                            # Recarrega joystick conforme seleção salva e atualiza a variável local 'joystick'
+                            try:
+                                sel = settings_manager.get_selected_joystick()
+                                joystick = reload_joystick(sel.get("selected_guid"))
+                            except Exception:
+                                joystick = None
+                    except Exception as e:
+                        print(f"Error drawing settings menu: {e}")
+                        # Falha ao desenhar menu de configurações; volta ao menu principal como fallback
+                        menu_state.active_menu = "main"
             else:  # GAME_STATE_GAME_OVER
                 final_score = abs(scroll_pos * 0.1) + beer_bonus_points
                 top_scores = high_score_manager.get_top_scores()
@@ -947,7 +1149,8 @@ def main():
                     draw_name_input_screen(menu_state, mouse_x, mouse_y, player_name)
                 else:
                     # Tela normal de game over
-                    draw_game_over_menu(final_score, menu_state, mouse_x, mouse_y, top_scores, new_high_score, player_name)
+                    draw_game_over_menu(final_score, menu_state, mouse_x, mouse_y, top_scores, new_high_score,
+                                        player_name)
 
         elif current_game_state == GAME_STATE_PLAYING:
             # --- Game Viewport (scaled) ---
@@ -959,27 +1162,27 @@ def main():
             glLoadIdentity()
 
             draw_road(scroll_pos)
-            
+
             # Desenha os buracos e manchas primeiro (para ficarem "abaixo" dos carros)
             for hole in holes:
                 hole.draw()
-                
+
             # Desenha as manchas de óleo
             for oil_stain in oil_stains:
                 oil_stain.draw()
-                
+
             # Desenha as cervejas colecionáveis
             for beer in beer_collectibles:
                 beer.draw()
-                
+
             # Desenha os indicadores de pontos
             for indicator in score_indicators:
                 indicator.draw()
-                
+
             # Desenha os power-ups de invulnerabilidade
             for powerup in invulnerability_powerups:
                 powerup.draw()
-                
+
             player_truck.draw()
             for enemy in enemies_up:
                 enemy.draw()
@@ -1001,7 +1204,7 @@ def main():
             # Painel lateral - fundo
             draw_rect(0, 0, PANEL_WIDTH, SCREEN_HEIGHT, COLOR_PANEL)
             time_elapsed = glfw.get_time()
-            
+
             # Calcula a velocidade considerando o efeito do buraco com transição suave
             base_speed = abs(scroll_speed * 400)
             if player_truck.slowed_down:
@@ -1009,14 +1212,14 @@ def main():
                 displayed_speed = base_speed * player_truck.current_speed_factor
             else:
                 displayed_speed = base_speed
-            
+
             score = abs(scroll_pos * 0.1) + beer_bonus_points
 
             # Top stats
             draw_text(f"Time: {int(time_elapsed)}", 12, SCREEN_HEIGHT - 28)
             draw_text(f"Speed: {displayed_speed:.0f} km/h", 12, SCREEN_HEIGHT - 52)
             draw_text(f"Score: {int(score)}", 12, SCREEN_HEIGHT - 76)
-            
+
             # Exibe as vidas usando corações desenhados geometricamente
             draw_text("Lives:", 12, SCREEN_HEIGHT - 100)
             lives_x = 80
@@ -1030,13 +1233,13 @@ def main():
                         color = (1.0, 0.3, 0.3)  # Vermelho
                 else:
                     color = (1.0, 0.3, 0.3)  # Vermelho normal
-                
+
                 draw_heart(lives_x + i * 25, SCREEN_HEIGHT - 95, size=10, color=color, filled=True)
-            
+
             # Desenha corações vazios para vidas perdidas
             for i in range(player_truck.lives, 3):
                 draw_heart(lives_x + i * 25, SCREEN_HEIGHT - 95, size=10, color=(0.5, 0.5, 0.5), filled=False)
-            
+
             # Reseta a cor para branco
             glColor3f(1.0, 1.0, 1.0)
 
@@ -1085,12 +1288,12 @@ def main():
             draw_text("Enemy (F5 / F6)", label_x, y0)
             draw_text(f"x{es:.2f}", label_x, y0 - line_height)
             y0 -= group_spacing
-            
+
             # Hole Spawn Probability
             draw_text("Buracos (F8 / F9)", label_x, y0)
             draw_text(f"{hs:.2f} prob.", label_x, y0 - line_height)
             y0 -= group_spacing
-            
+
             # Oil Stain Spawn Probability
             oil_prob = difficulty_info.get("oil_stain_spawn_probability", 0.0)
             max_os = difficulty_manager.max_oil_stain_spawn_probability
@@ -1098,7 +1301,7 @@ def main():
             draw_text("Óleo (F10 / F11)", label_x, y0)
             draw_text(f"{oil_prob:.2f} prob.", label_x, y0 - line_height)
             y0 -= group_spacing
-            
+
             # Invulnerability Power-Up Spawn Probability
             inv_prob = difficulty_info.get("invulnerability_spawn_probability", 0.0)
             max_inv = difficulty_manager.max_invulnerability_spawn_probability
@@ -1122,6 +1325,7 @@ def main():
         glfw.swap_buffers(window)
 
     glfw.terminate()
+
 
 if __name__ == "__main__":
     main()

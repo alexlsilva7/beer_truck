@@ -23,7 +23,7 @@ COLOR_INPUT_TEXT = (1.0, 1.0, 1.0)
 class MenuState:
     def __init__(self):
         self.selected_button = 0
-        self.active_menu = "main"  # "main", "instructions", "game_over"
+        self.active_menu = "main"  # "main", "instructions", "game_over", "settings"
         self.mouse_pressed = False
 
 def draw_text(text, x, y, font=GLUT_BITMAP_HELVETICA_18, color=COLOR_TEXT):
@@ -171,7 +171,8 @@ def draw_start_menu(menu_state, mouse_x, mouse_y, high_score_data=None):
     buttons = [
         {"text": "INICIAR JOGO", "y": button_base_y, "action": "start"},
         {"text": "COMO JOGAR", "y": button_base_y - 70, "action": "instructions"},
-        {"text": "SAIR", "y": button_base_y - 140, "action": "quit"}
+        {"text": "CONFIGURACOES", "y": button_base_y - 140, "action": "settings"},
+        {"text": "SAIR", "y": button_base_y - 210, "action": "quit"}
     ]
 
     hovered_button = None
