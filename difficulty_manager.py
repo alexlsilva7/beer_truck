@@ -29,20 +29,20 @@ class DifficultyManager:
         self.invulnerability_spawn_counter = 0
 
         # Taxas de aumento por segundo
-        self.scroll_speed_increase_rate = 0.002
-        self.spawn_rate_decrease_rate = 0.011
-        self.enemy_speed_increase_rate = 0.004
-        self.hole_spawn_increase_rate = 0.0005  # Aumento gradual da chance de buracos
-        self.oil_stain_spawn_increase_rate = 0.0003  # Aumento gradual da chance de manchas de óleo
-        self.invulnerability_spawn_increase_rate = 0.0001  # Aumento gradual da chance de power-ups
+        self.scroll_speed_increase_rate = 0.005  # Aumentado de 0.002 para 0.005 (2.5x mais rápido)
+        self.spawn_rate_decrease_rate = 0.015  # Aumentado de 0.011 para 0.015
+        self.enemy_speed_increase_rate = 0.008  # Aumentado de 0.004 para 0.008 (2x mais rápido)
+        self.hole_spawn_increase_rate = 0.0007  # Aumento gradual da chance de buracos
+        self.oil_stain_spawn_increase_rate = 0.0005  # Aumento gradual da chance de manchas de óleo
+        self.invulnerability_spawn_increase_rate = 0.0002  # Aumento gradual da chance de power-ups
 
         # Limites máximos para evitar valores extremos
-        self.max_scroll_speed_multiplier = 2.0
-        self.min_spawn_rate_multiplier = 0.20
-        self.max_enemy_speed_multiplier = 2.5
-        self.max_hole_spawn_probability = 0.5  # Máximo de 50% de chance
-        self.max_oil_stain_spawn_probability = 0.4  # Máximo de 40% de chance
-        self.max_invulnerability_spawn_probability = 0.8  # Aumentado para 80% para facilitar testes
+        self.max_scroll_speed_multiplier = 3.5  # Aumentado de 2.0 para 3.5 (75% mais rápido)
+        self.min_spawn_rate_multiplier = 0.15  # Reduzido de 0.20 para 0.15 (mais inimigos)
+        self.max_enemy_speed_multiplier = 3.8  # Aumentado de 2.5 para 3.8 (52% mais rápido)
+        self.max_hole_spawn_probability = 0.6  # Aumentado de 0.5 para 0.6 (mais buracos)
+        self.max_oil_stain_spawn_probability = 0.5  # Aumentado de 0.4 para 0.5
+        self.max_invulnerability_spawn_probability = 0.8  # Mantido em 80% para facilitar testes
         self.max_beer_spawn_probability = 0.8  # Máximo de 80% de chance, igual à invulnerabilidade
 
         # Controles para ajustes manuais
