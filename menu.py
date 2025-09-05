@@ -22,9 +22,9 @@ COLOR_INPUT_TEXT = (1.0, 1.0, 1.0)
 # --- Estado do Menu ---
 class MenuState:
     def __init__(self):
-        self.selected_button = 0
-        self.active_menu = "main"  # "main", "instructions", "game_over"
+        self.active_menu = "main"
         self.mouse_pressed = False
+        self.clickable_areas = []
 
 def draw_text(text, x, y, font=GLUT_BITMAP_HELVETICA_18, color=COLOR_TEXT):
     """Desenha um texto na tela com coordenadas estáveis."""
@@ -84,7 +84,7 @@ def draw_lives(lives, x, y, invulnerable=False):
         draw_text("o", x + i * 15, y, color=(0.5, 0.5, 0.5))
 
 def draw_button(x, y, width, height, text, is_hovered=False, is_pressed=False):
-    """Desenha um botão com texto e bordas arredondadas."""
+    """Desenha um botão com texto."""
     if is_pressed:
         color = COLOR_BUTTON_PRESSED
     elif is_hovered:
@@ -92,24 +92,14 @@ def draw_button(x, y, width, height, text, is_hovered=False, is_pressed=False):
     else:
         color = COLOR_BUTTON
 
-    # Miolo do botão
-    draw_rect(x, y, width, height, color)
+    # Miolo preto para os botões
+    draw_rect(x, y, width, height, (0, 0, 0))
 
-    # Borda do botão
-    glColor3f(1.0, 1.0, 1.0)
-    glLineWidth(2.0)
-    glBegin(GL_LINE_LOOP)
-    glVertex2f(x, y)
-    glVertex2f(x + width, y)
-    glVertex2f(x + width, y + height)
-    glVertex2f(x, y + height)
-    glEnd()
-    glLineWidth(1.0)
-
-    # Texto do botão
+    # Texto do botão (amarelo ao passar o mouse)
     text_x = x + width / 2
-    text_y = y + (height - 12) / 2  # Centraliza o texto de 18px
-    draw_text_centered(text, text_x, text_y, font=GLUT_BITMAP_HELVETICA_18)
+    text_y = y + (height - 18) / 2
+    text_color = (1, 1, 0) if is_hovered else (1, 1, 1) # Amarelo se hovered, senão branco
+    draw_text_centered(text, text_x, text_y, font=GLUT_BITMAP_HELVETICA_18, color=text_color)
 
 
 def draw_title():
@@ -145,12 +135,14 @@ def draw_menu_background():
 
 
 def draw_start_menu(menu_state, mouse_x, mouse_y, high_score_data=None):
-    """Desenha a tela inicial do menu."""
+    """Desenha a tela inicial do menu e registra os botões."""
     draw_menu_background()
     draw_title()
+    menu_state.clickable_areas.clear()  # <-- 1. Limpa áreas da tela anterior
 
     # Exibe o Top 3
-    draw_text_centered("TOP 3 RECORDES", SCREEN_WIDTH / 2, SCREEN_HEIGHT - 180, font=GLUT_BITMAP_TIMES_ROMAN_24, color=COLOR_HIGH_SCORE)
+    draw_text_centered("TOP 3 RECORDES", SCREEN_WIDTH / 2, SCREEN_HEIGHT - 180, font=GLUT_BITMAP_TIMES_ROMAN_24,
+                       color=COLOR_HIGH_SCORE)
 
     if high_score_data and high_score_data["scores"]:
         positions = ["1º", "2º", "3º"]
@@ -159,12 +151,13 @@ def draw_start_menu(menu_state, mouse_x, mouse_y, high_score_data=None):
             score_text = f"{positions[i]}: {score['name']} - {score['score']}"
             draw_text_centered(score_text, SCREEN_WIDTH / 2, y_pos, color=COLOR_HIGH_SCORE)
     else:
-        draw_text_centered("Nenhum recorde ainda! Seja o primeiro!", SCREEN_WIDTH / 2, SCREEN_HEIGHT - 220, color=COLOR_HIGH_SCORE)
+        draw_text_centered("Nenhum recorde ainda! Seja o primeiro!", SCREEN_WIDTH / 2, SCREEN_HEIGHT - 220,
+                           color=COLOR_HIGH_SCORE)
 
     button_width = 250
     button_height = 50
     button_x = (SCREEN_WIDTH - button_width) / 2
-    
+
     # Ajusta a posição dos botões para ficarem abaixo dos recordes
     button_base_y = SCREEN_HEIGHT / 2 - 50
 
@@ -174,23 +167,22 @@ def draw_start_menu(menu_state, mouse_x, mouse_y, high_score_data=None):
         {"text": "SAIR", "y": button_base_y - 140, "action": "quit"}
     ]
 
-    hovered_button = None
-    for i, button in enumerate(buttons):
+    for button in buttons:
         is_hovered = (button_x <= mouse_x <= button_x + button_width and
                       button["y"] <= mouse_y <= button["y"] + button_height)
-
         is_pressed = is_hovered and menu_state.mouse_pressed
-        
-        draw_button(button_x, button["y"], button_width, button_height, button["text"], is_hovered, is_pressed)
-        
-        if is_hovered:
-            hovered_button = button["action"]
 
-    return hovered_button
+        # <-- 2. Registra a área clicável de cada botão
+        rect = (button_x, button["y"], button_width, button_height)
+        menu_state.clickable_areas.append({'rect': rect, 'action': button['action']})
+
+        draw_button(button_x, button["y"], button_width, button_height, button["text"], is_hovered, is_pressed)
+
 
 def draw_instructions_screen(menu_state, mouse_x, mouse_y):
-    """Desenha a tela de instruções."""
+    """Desenha a tela de instruções e registra o botão de voltar."""
     draw_menu_background()
+    menu_state.clickable_areas.clear()  # <-- 1. Limpa áreas da tela anterior
 
     title_y = SCREEN_HEIGHT - 100
     draw_text_centered("COMO JOGAR", SCREEN_WIDTH / 2, title_y, font=GLUT_BITMAP_TIMES_ROMAN_24, color=COLOR_TITLE)
@@ -216,73 +208,66 @@ def draw_instructions_screen(menu_state, mouse_x, mouse_y):
     button_x = (SCREEN_WIDTH - button_width) / 2
     button_y = 100
 
-    # **CORREÇÃO APLICADA AQUI**
     is_hovered = (button_x <= mouse_x <= button_x + button_width and
                   button_y <= mouse_y <= button_y + button_height)
     is_pressed = is_hovered and menu_state.mouse_pressed
 
-    draw_button(button_x, button_y, button_width, button_height, "VOLTAR", is_hovered, is_pressed)
+    # <-- 2. Registra a área clicável do botão VOLTAR
+    rect = (button_x, button_y, button_width, button_height)
+    menu_state.clickable_areas.append({'rect': rect, 'action': 'main'})
 
-    if is_hovered:
-        return "main"
-    return None
+    draw_button(button_x, button_y, button_width, button_height, "VOLTAR", is_hovered, is_pressed)
 
 
 def draw_game_over_menu(score, menu_state, mouse_x, mouse_y, top_scores=None, is_new_high_score=False, player_name=""):
-    """Desenha a tela de game over."""
+    """Desenha a tela de game over e registra os botões."""
     draw_menu_background()
+    menu_state.clickable_areas.clear()  # Limpa áreas da tela anterior
 
     title_y = SCREEN_HEIGHT - 150
     draw_text_centered("GAME OVER", SCREEN_WIDTH / 2, title_y, font=GLUT_BITMAP_TIMES_ROMAN_24, color=(1.0, 0.3, 0.3))
 
-    # Pontuação atual
     score_y = title_y - 60
-    draw_text_centered(f"Sua pontuação: {int(score)}", SCREEN_WIDTH / 2, score_y, font=GLUT_BITMAP_HELVETICA_18)
+    draw_text_centered(f"Sua pontuação: {int(score)}", SCREEN_WIDTH / 2, score_y)
 
-    # Top 3 recordes
+    current_y = score_y - 40
     if top_scores:
-        positions = ["1º", "2º", "3º"]
-        high_score_y = score_y - 40
-        draw_text_centered("TOP 3 RECORDES", SCREEN_WIDTH / 2, high_score_y, font=GLUT_BITMAP_HELVETICA_18, color=COLOR_HIGH_SCORE)
-
+        current_y -= 20
+        draw_text_centered("TOP 3 RECORDES", SCREEN_WIDTH / 2, current_y, color=COLOR_HIGH_SCORE)
+        current_y -= 10
         for i, score_data in enumerate(top_scores):
-            y_pos = high_score_y - 30 - (i * 30)
-            score_text = f"{positions[i]}: {score_data['name']} - {score_data['score']}"
-            draw_text_centered(score_text, SCREEN_WIDTH / 2, y_pos, font=GLUT_BITMAP_HELVETICA_18, color=COLOR_HIGH_SCORE)
+            current_y -= 30
+            score_text = f"{i + 1}º: {score_data['name']} - {score_data['score']}"
+            draw_text_centered(score_text, SCREEN_WIDTH / 2, current_y, color=COLOR_HIGH_SCORE)
 
-    # Destaque para novo high score
     if is_new_high_score:
-        new_hs_y = high_score_y - 120  # Ajustado para ficar abaixo do top 3
-        draw_text_centered("NOVO RECORDE!", SCREEN_WIDTH / 2, new_hs_y, font=GLUT_BITMAP_TIMES_ROMAN_24, color=COLOR_NEW_HIGH_SCORE)
-        instructions_y = new_hs_y - 40
-        if not player_name:  # Só mostra a mensagem se o jogador ainda não começou a digitar
-            draw_text_centered("Digite seu nome e pressione ENTER", SCREEN_WIDTH / 2, instructions_y, font=GLUT_BITMAP_HELVETICA_18)
+        current_y -= 40
+        draw_text_centered("NOVO RECORDE!", SCREEN_WIDTH / 2, current_y, font=GLUT_BITMAP_TIMES_ROMAN_24,
+                           color=COLOR_NEW_HIGH_SCORE)
+        current_y -= 30
+        if not player_name:
+            draw_text_centered("Digite seu nome e pressione ENTER", SCREEN_WIDTH / 2, current_y)
 
-    # Botões
     button_width = 250
     button_height = 50
     button_x = (SCREEN_WIDTH - button_width) / 2
-
-    # Ajusta a posição dos botões se for um novo high score
-    button_offset = 0
-    if is_new_high_score:
-        button_offset = -80
+    button_base_y = current_y - 80
 
     buttons = [
-        {"text": "JOGAR NOVAMENTE", "y": SCREEN_HEIGHT / 2 - 50 + button_offset, "action": "restart"},
-        {"text": "MENU PRINCIPAL", "y": SCREEN_HEIGHT / 2 - 120 + button_offset, "action": "main"}
+        {"text": "JOGAR NOVAMENTE", "y": button_base_y, "action": "restart"},
+        {"text": "MENU PRINCIPAL", "y": button_base_y - 70, "action": "main"}
     ]
 
-    hovered_button = None
     for button in buttons:
         is_hovered = (button_x <= mouse_x <= button_x + button_width and
                       button["y"] <= mouse_y <= button["y"] + button_height)
         is_pressed = is_hovered and menu_state.mouse_pressed
-        draw_button(button_x, button["y"], button_width, button_height, button["text"], is_hovered, is_pressed)
-        if is_hovered:
-            hovered_button = button["action"]
 
-    return hovered_button
+        # Registra a área clicável antes de desenhar
+        rect = (button_x, button["y"], button_width, button_height)
+        menu_state.clickable_areas.append({'rect': rect, 'action': button['action']})
+
+        draw_button(button_x, button["y"], button_width, button_height, button["text"], is_hovered, is_pressed)
 
 def draw_high_scores_screen(high_scores, menu_state, mouse_x, mouse_y):
     """Desenha a tela de high scores."""

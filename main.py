@@ -201,7 +201,7 @@ def mouse_button_callback(window, button, action, mods):
             menu_state.mouse_pressed = True
         elif action == glfw.RELEASE:
             menu_state.mouse_pressed = False
-            # Pega coordenadas do cursor em pixels e converte para coordenadas lógicas do jogo
+
             mouse_px, mouse_py = glfw.get_cursor_pos(window)
             inv_mouse_py = (fb_height or SCREEN_HEIGHT) - mouse_py
             scale = current_scale or 1.0
@@ -210,100 +210,45 @@ def mouse_button_callback(window, button, action, mods):
             mouse_x = (mouse_px - offset_x) / scale
             mouse_y = (inv_mouse_py - offset_y) / scale
 
-            if current_game_state == GAME_STATE_MENU:
-                if menu_state.active_menu == "main":
-                    hovered_button = get_hovered_button_main_menu(mouse_x, mouse_y)
-                    if hovered_button == "start":
+            # --- LÓGICA DE CLIQUE UNIFICADA ---
+            if current_game_state == GAME_STATE_MENU or (
+                    current_game_state == GAME_STATE_GAME_OVER and not asking_for_name):
+                clicked_action = None
+                for area in menu_state.clickable_areas:
+                    x, y, w, h = area['rect']
+                    if x <= mouse_x <= x + w and y <= mouse_y <= y + h:
+                        clicked_action = area['action']
+                        break
+
+                if clicked_action:
+                    if clicked_action == "start":
                         current_game_state = GAME_STATE_PLAYING
                         reset_game()
-                        # --- Inicia a música de fundo ---
                         try:
-                            audio_manager.play_background_music("assets/sound/background_music_1.mp3", volume=0.5, fade_ms=500, loop=True)
+                            audio_manager.play_background_music("assets/sound/background_music_1.mp3", volume=0.5,
+                                                                fade_ms=500, loop=True)
                         except Exception as e:
                             print(f"Erro ao iniciar a música de fundo: {e}")
-                    elif hovered_button == "instructions":
+
+                    elif clicked_action == "instructions":
                         menu_state.active_menu = "instructions"
-                    elif hovered_button == "quit":
+
+                    elif clicked_action == "quit":
                         glfw.set_window_should_close(window, True)
-                elif menu_state.active_menu == "instructions":
-                    hovered_button = get_hovered_button_instructions_menu(mouse_x, mouse_y)
-                    if hovered_button == "main":
-                        menu_state.active_menu = "main"
 
-            elif current_game_state == GAME_STATE_GAME_OVER:
-                # Se estiver pedindo o nome do jogador, não processa cliques nos botões de game over
-                if asking_for_name:
-                    # Verificar se o clique foi no botão de confirmar
-                    input_box_x = (SCREEN_WIDTH - 400) / 2
-                    input_box_y = SCREEN_HEIGHT / 2 - 25
-                    if input_box_x <= mouse_x <= input_box_x + 400 and SCREEN_HEIGHT - mouse_y >= input_box_y and SCREEN_HEIGHT - mouse_y <= input_box_y + 50:
-                        # Clique na caixa de entrada, não faz nada (continua esperando entrada de teclado)
-                        pass
-                    else:
-                        # Clique em outros botões da tela de input
-                        button_width = 200
-                        button_x = (SCREEN_WIDTH - button_width) / 2
-                        button_y = 100
-
-                        # Botão confirmar
-                        if button_x <= mouse_x <= button_x + button_width and SCREEN_HEIGHT - mouse_y >= button_y and SCREEN_HEIGHT - mouse_y <= button_y + 50:
-                            if len(player_name) > 0:
-                                score = abs(scroll_pos * 0.1) + beer_bonus_points
-                                high_score_manager.add_high_score(player_name, int(score))
-                                asking_for_name = False
-
-                        # Botão voltar
-                        elif button_x <= mouse_x <= button_x + button_width and SCREEN_HEIGHT - mouse_y >= button_y + 70 and SCREEN_HEIGHT - mouse_y <= button_y + 70 + 50:
-                            asking_for_name = False
-                else:
-                    # Comportamento normal de game over quando não está pedindo o nome
-                    hovered_button = get_hovered_button_game_over_menu(mouse_x, mouse_y)
-                    if hovered_button == "restart":
-                        current_game_state = GAME_STATE_PLAYING
-                        reset_game()
-                        # --- Inicia a música de fundo --- # <--- NOVO
-                        try:
-                            audio_manager.play_background_music("assets/sound/background_music_1.mp3", volume=0.8, fade_ms=500, loop=True)
-                        except Exception as e:
-                            print(f"Erro ao iniciar a música de fundo: {e}")
-                    elif hovered_button == "main":
+                    elif clicked_action == "main":
                         current_game_state = GAME_STATE_MENU
                         menu_state.active_menu = "main"
                         reset_game()
 
-# --- Funções Auxiliares de Menu ---
-def get_hovered_button_main_menu(mouse_x, mouse_y):
-    button_width = 250
-    button_x = (road.SCREEN_WIDTH - button_width) / 2
-    buttons = [
-        {"y": road.SCREEN_HEIGHT / 2 - 50, "action": "start"},
-        {"y": road.SCREEN_HEIGHT / 2 - 120, "action": "instructions"},
-        {"y": road.SCREEN_HEIGHT / 2 - 190, "action": "quit"}
-    ]
-    for btn in buttons:
-        if button_x <= mouse_x <= button_x + button_width and btn["y"] <= mouse_y <= btn["y"] + 50:
-            return btn["action"]
-    return None
-
-def get_hovered_button_instructions_menu(mouse_x, mouse_y):
-    button_width = 200
-    button_x = (road.SCREEN_WIDTH - button_width) / 2
-    button_y = 100
-    if button_x <= mouse_x <= button_x + button_width and button_y <= mouse_y <= button_y + 50:
-        return "main"
-    return None
-
-def get_hovered_button_game_over_menu(mouse_x, mouse_y):
-    button_width = 250
-    button_x = (road.SCREEN_WIDTH - button_width) / 2
-    buttons = [
-        {"y": road.SCREEN_HEIGHT / 2 - 50, "action": "restart"},
-        {"y": road.SCREEN_HEIGHT / 2 - 120, "action": "main"}
-    ]
-    for btn in buttons:
-        if button_x <= mouse_x <= button_x + button_width and btn["y"] <= mouse_y <= btn["y"] + 50:
-            return btn["action"]
-    return None
+                    elif clicked_action == "restart":
+                        current_game_state = GAME_STATE_PLAYING
+                        reset_game()
+                        try:
+                            audio_manager.play_background_music("assets/sound/background_music_1.mp3", volume=0.8,
+                                                                fade_ms=500, loop=True)
+                        except Exception as e:
+                            print(f"Erro ao iniciar a música de fundo: {e}")
 
 def reset_game():
     global scroll_pos, player_truck, enemies_up, enemies_down, spawn_timer_up, spawn_timer_down, player_name, asking_for_name, new_high_score, police_car,  holes, hole_spawn_timer, oil_stains, oil_stain_spawn_timer, beer_collectibles, beer_spawn_timer, invulnerability_powerups, invulnerability_spawn_timer, score_indicators, pending_score_bonus, beer_bonus_points, last_police_spawn_time
