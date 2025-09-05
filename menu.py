@@ -344,3 +344,46 @@ def draw_name_input_screen(menu_state, mouse_x, mouse_y, input_text=""):
         return "main"
 
     return None
+
+def draw_pause_menu(menu_state, mouse_x, mouse_y):
+    """Desenha a tela de pausa sobre o jogo."""
+    menu_state.clickable_areas.clear()
+
+    # --- Fundo semi-transparente ---
+    glEnable(GL_BLEND)
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
+    glColor4f(0.0, 0.0, 0.0, 0.7)
+    glDisable(GL_TEXTURE_2D)
+    glBegin(GL_QUADS)
+    glVertex2f(0, 0)
+    glVertex2f(SCREEN_WIDTH, 0)
+    glVertex2f(SCREEN_WIDTH, SCREEN_HEIGHT)
+    glVertex2f(0, SCREEN_HEIGHT)
+    glEnd()
+    glEnable(GL_TEXTURE_2D)
+    glDisable(GL_BLEND)
+
+    # --- Título ---
+    title_y = SCREEN_HEIGHT - 200
+    draw_text_centered("PAUSADO", SCREEN_WIDTH / 2, title_y, font=GLUT_BITMAP_TIMES_ROMAN_24, color=COLOR_TITLE)
+
+    # --- Botões ---
+    button_width = 250
+    button_height = 50
+    button_x = (SCREEN_WIDTH - button_width) / 2
+    button_base_y = SCREEN_HEIGHT / 2
+
+    buttons = [
+        {"text": "CONTINUAR", "y": button_base_y, "action": "resume"},
+        {"text": "MENU PRINCIPAL", "y": button_base_y - 70, "action": "main"}
+    ]
+
+    for button in buttons:
+        is_hovered = (button_x <= mouse_x <= button_x + button_width and
+                      button["y"] <= mouse_y <= button["y"] + button_height)
+        is_pressed = is_hovered and menu_state.mouse_pressed
+
+        rect = (button_x, button["y"], button_width, button_height)
+        menu_state.clickable_areas.append({'rect': rect, 'action': button['action']})
+
+        draw_button(button_x, button["y"], button_width, button_height, button["text"], is_hovered, is_pressed)
