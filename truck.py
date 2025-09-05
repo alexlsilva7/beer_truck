@@ -1,6 +1,7 @@
 from OpenGL.GL import *
 from road import ROAD_WIDTH, GAME_WIDTH, SCREEN_HEIGHT
 import time
+import math
 
 
 class Truck:
@@ -115,7 +116,7 @@ class Truck:
         glDisable(GL_TEXTURE_2D)
         glDisable(GL_BLEND)
 
-    def move(self, dx, dy):
+    def move(self, dx, dy, game_speed_multiplier=None):
         """Move o caminhão nas direções x e y."""
         # Inverte os controles se o efeito estiver ativo
         if self.controls_inverted:
@@ -123,8 +124,18 @@ class Truck:
             dy = -dy
             
         # Aplica o efeito de diminuição de velocidade se necessário
-        actual_speed_x = self.speed_x * (self.current_speed_factor if self.slowed_down else 1.0)
-        actual_speed_y = self.speed_y * (self.current_speed_factor if self.slowed_down else 1.0)
+        speed_factor = self.current_speed_factor if self.slowed_down else 1.0
+        
+        # Ajusta a velocidade base de acordo com o multiplicador do jogo
+        if game_speed_multiplier is not None:
+            # Ajusta a velocidade proporcionalmente, mas não de forma linear (raiz quadrada suaviza)
+            import math
+            game_factor = math.sqrt(game_speed_multiplier)  # Suaviza o aumento
+            actual_speed_x = self.speed_x * speed_factor * game_factor
+            actual_speed_y = self.speed_y * speed_factor * game_factor
+        else:
+            actual_speed_x = self.speed_x * speed_factor
+            actual_speed_y = self.speed_y * speed_factor
         
         self.x += dx * actual_speed_x
         road_x_start = (GAME_WIDTH - ROAD_WIDTH) / 2

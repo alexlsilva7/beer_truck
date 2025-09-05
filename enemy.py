@@ -36,10 +36,18 @@ class Enemy:
         self.x = lane_x_start + (LANE_WIDTH - self.width) / 2
         self.y = SCREEN_HEIGHT
 
-    def update(self, all_enemies):
-        """Move o inimigo e evita colisões com outros inimigos."""
+    def update(self, all_enemies, current_scroll_speed=None):
+        """Move o inimigo e evita colisões com outros inimigos, ajustando velocidade com base no scroll atual."""
         if self.crashed:
             return
+
+        # Determina a velocidade efetiva com base no scroll_speed atual
+        effective_speed = self.speed_y
+        if current_scroll_speed is not None:
+            # Normaliza o scroll_speed em relação ao PLAYER_SPEED base
+            base_scroll_factor = abs(current_scroll_speed) / PLAYER_SPEED
+            # Ajusta a velocidade para acompanhar a progressão do jogo
+            effective_speed = self.speed_y * base_scroll_factor
 
         # Lógica para evitar passar por cima de outros inimigos
         for other in all_enemies:
@@ -51,10 +59,10 @@ class Enemy:
                 distance = self.y - (other.y + other.height)
                 if distance < 10:  # Pequena distância de segurança
                     # Reduz a velocidade para a do carro da frente
-                    if self.speed_y > other.speed_y:
-                        self.speed_y = other.speed_y
+                    if effective_speed > other.speed_y:
+                        effective_speed = other.speed_y
 
-        self.y -= self.speed_y
+        self.y -= effective_speed
 
     def draw(self):
         """Desenha o inimigo na tela usando sua textura."""

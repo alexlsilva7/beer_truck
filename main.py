@@ -589,7 +589,9 @@ def main():
                     elif glfw.get_key(window, glfw.KEY_DOWN) == glfw.PRESS:
                         dy = scroll_speed / player_truck.speed_y
 
-                player_truck.move(dx, dy)
+                # Passa o multiplicador de velocidade atual do jogo
+                current_speed_multiplier = difficulty_manager.scroll_speed_multiplier
+                player_truck.move(dx, dy, game_speed_multiplier=current_speed_multiplier)
             else:
                 # --- LÓGICA DE CRASH / RESPAWN / GAME OVER ---
                 # Empurra o caminhão com o scroll quando está crashado
@@ -686,7 +688,7 @@ def main():
             # --- Enemy Update & Collision ---
             all_enemies = enemies_up + enemies_down
             for enemy in all_enemies:
-                enemy.update(all_enemies)
+                enemy.update(all_enemies, scroll_speed)
                 # Marca inimigos que colidem com o caminhão
                 if not enemy.crashed and player_truck.check_collision(enemy):
                     # O inimigo sempre fica crashed quando há colisão
