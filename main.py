@@ -21,7 +21,7 @@ from beer_collectible import BeerCollectible
 from invulnerability import InvulnerabilityPowerUp
 from score_indicator import ScoreIndicator
 from texture_loader import load_texture
-from menu import MenuState, draw_start_menu, draw_instructions_screen, draw_game_over_menu, draw_name_input_screen, draw_lives
+from menu import MenuState, draw_start_menu, draw_instructions_screen, draw_game_over_menu, draw_name_input_screen, draw_lives, draw_pause_menu
 from difficulty_manager import DifficultyManager
 from high_score_manager import HighScoreManager
 import audio_manager
@@ -30,6 +30,7 @@ import audio_manager
 GAME_STATE_MENU = 0
 GAME_STATE_PLAYING = 1
 GAME_STATE_GAME_OVER = 2
+GAME_STATE_PAUSED = 3
 
 # --- Variáveis Globais para Toggle Borderless ---
 is_borderless = False
@@ -117,16 +118,15 @@ def key_callback(window, key, scancode, action, mods):
 
     if key == glfw.KEY_ESCAPE and action == glfw.PRESS:
         if current_game_state == GAME_STATE_PLAYING:
-            current_game_state = GAME_STATE_MENU
-            menu_state.active_menu = "main"
-            audio_manager.stop_all()
+            current_game_state = GAME_STATE_PAUSED
+        elif current_game_state == GAME_STATE_PAUSED:
+            current_game_state = GAME_STATE_PLAYING
         elif current_game_state == GAME_STATE_MENU:
             if menu_state.active_menu == "instructions":
                 menu_state.active_menu = "main"
             else:
                 glfw.set_window_should_close(window, True)
         elif current_game_state == GAME_STATE_GAME_OVER and asking_for_name:
-            # Se estiver pedindo o nome e ESC for pressionado, cancela a entrada
             asking_for_name = False
             player_name = ""
 
@@ -201,7 +201,7 @@ def mouse_button_callback(window, button, action, mods):
             menu_state.mouse_pressed = True
         elif action == glfw.RELEASE:
             menu_state.mouse_pressed = False
-            # Pega coordenadas do cursor em pixels e converte para coordenadas lógicas do jogo
+
             mouse_px, mouse_py = glfw.get_cursor_pos(window)
             inv_mouse_py = (fb_height or SCREEN_HEIGHT) - mouse_py
             scale = current_scale or 1.0
@@ -210,100 +210,50 @@ def mouse_button_callback(window, button, action, mods):
             mouse_x = (mouse_px - offset_x) / scale
             mouse_y = (inv_mouse_py - offset_y) / scale
 
-            if current_game_state == GAME_STATE_MENU:
-                if menu_state.active_menu == "main":
-                    hovered_button = get_hovered_button_main_menu(mouse_x, mouse_y)
-                    if hovered_button == "start":
+            # --- LÓGICA DE CLIQUE UNIFICADA ---
+            if current_game_state == GAME_STATE_MENU or \
+                    current_game_state == GAME_STATE_PAUSED or \
+                    (current_game_state == GAME_STATE_GAME_OVER and not asking_for_name):
+
+                clicked_action = None
+                for area in menu_state.clickable_areas:
+                    x, y, w, h = area['rect']
+                    if x <= mouse_x <= x + w and y <= mouse_y <= y + h:
+                        clicked_action = area['action']
+                        break
+
+                if clicked_action:
+                    if clicked_action == "start":
                         current_game_state = GAME_STATE_PLAYING
                         reset_game()
-                        # --- Inicia a música de fundo ---
                         try:
-                            audio_manager.play_background_music("assets/sound/background_music_1.mp3", volume=0.5, fade_ms=500, loop=True)
+                            audio_manager.play_background_music("assets/sound/background_music_1.mp3", volume=0.5,
+                                                                fade_ms=500, loop=True)
                         except Exception as e:
                             print(f"Erro ao iniciar a música de fundo: {e}")
-                    elif hovered_button == "instructions":
+
+                    elif clicked_action == "instructions":
                         menu_state.active_menu = "instructions"
-                    elif hovered_button == "quit":
+
+                    elif clicked_action == "quit":
                         glfw.set_window_should_close(window, True)
-                elif menu_state.active_menu == "instructions":
-                    hovered_button = get_hovered_button_instructions_menu(mouse_x, mouse_y)
-                    if hovered_button == "main":
-                        menu_state.active_menu = "main"
 
-            elif current_game_state == GAME_STATE_GAME_OVER:
-                # Se estiver pedindo o nome do jogador, não processa cliques nos botões de game over
-                if asking_for_name:
-                    # Verificar se o clique foi no botão de confirmar
-                    input_box_x = (SCREEN_WIDTH - 400) / 2
-                    input_box_y = SCREEN_HEIGHT / 2 - 25
-                    if input_box_x <= mouse_x <= input_box_x + 400 and SCREEN_HEIGHT - mouse_y >= input_box_y and SCREEN_HEIGHT - mouse_y <= input_box_y + 50:
-                        # Clique na caixa de entrada, não faz nada (continua esperando entrada de teclado)
-                        pass
-                    else:
-                        # Clique em outros botões da tela de input
-                        button_width = 200
-                        button_x = (SCREEN_WIDTH - button_width) / 2
-                        button_y = 100
-
-                        # Botão confirmar
-                        if button_x <= mouse_x <= button_x + button_width and SCREEN_HEIGHT - mouse_y >= button_y and SCREEN_HEIGHT - mouse_y <= button_y + 50:
-                            if len(player_name) > 0:
-                                score = abs(scroll_pos * 0.1) + beer_bonus_points
-                                high_score_manager.add_high_score(player_name, int(score))
-                                asking_for_name = False
-
-                        # Botão voltar
-                        elif button_x <= mouse_x <= button_x + button_width and SCREEN_HEIGHT - mouse_y >= button_y + 70 and SCREEN_HEIGHT - mouse_y <= button_y + 70 + 50:
-                            asking_for_name = False
-                else:
-                    # Comportamento normal de game over quando não está pedindo o nome
-                    hovered_button = get_hovered_button_game_over_menu(mouse_x, mouse_y)
-                    if hovered_button == "restart":
-                        current_game_state = GAME_STATE_PLAYING
-                        reset_game()
-                        # --- Inicia a música de fundo --- # <--- NOVO
-                        try:
-                            audio_manager.play_background_music("assets/sound/background_music_1.mp3", volume=0.8, fade_ms=500, loop=True)
-                        except Exception as e:
-                            print(f"Erro ao iniciar a música de fundo: {e}")
-                    elif hovered_button == "main":
+                    elif clicked_action == "main":
                         current_game_state = GAME_STATE_MENU
                         menu_state.active_menu = "main"
                         reset_game()
 
-# --- Funções Auxiliares de Menu ---
-def get_hovered_button_main_menu(mouse_x, mouse_y):
-    button_width = 250
-    button_x = (road.SCREEN_WIDTH - button_width) / 2
-    buttons = [
-        {"y": road.SCREEN_HEIGHT / 2 - 50, "action": "start"},
-        {"y": road.SCREEN_HEIGHT / 2 - 120, "action": "instructions"},
-        {"y": road.SCREEN_HEIGHT / 2 - 190, "action": "quit"}
-    ]
-    for btn in buttons:
-        if button_x <= mouse_x <= button_x + button_width and btn["y"] <= mouse_y <= btn["y"] + 50:
-            return btn["action"]
-    return None
+                    elif clicked_action == "restart":
+                        current_game_state = GAME_STATE_PLAYING
+                        reset_game()
+                        try:
+                            audio_manager.play_background_music("assets/sound/background_music_1.mp3", volume=0.8,
+                                                                fade_ms=500, loop=True)
+                        except Exception as e:
+                            print(f"Erro ao iniciar a música de fundo: {e}")
 
-def get_hovered_button_instructions_menu(mouse_x, mouse_y):
-    button_width = 200
-    button_x = (road.SCREEN_WIDTH - button_width) / 2
-    button_y = 100
-    if button_x <= mouse_x <= button_x + button_width and button_y <= mouse_y <= button_y + 50:
-        return "main"
-    return None
-
-def get_hovered_button_game_over_menu(mouse_x, mouse_y):
-    button_width = 250
-    button_x = (road.SCREEN_WIDTH - button_width) / 2
-    buttons = [
-        {"y": road.SCREEN_HEIGHT / 2 - 50, "action": "restart"},
-        {"y": road.SCREEN_HEIGHT / 2 - 120, "action": "main"}
-    ]
-    for btn in buttons:
-        if button_x <= mouse_x <= button_x + button_width and btn["y"] <= mouse_y <= btn["y"] + 50:
-            return btn["action"]
-    return None
+                    elif clicked_action == "resume":
+                        current_game_state = GAME_STATE_PLAYING
 
 def reset_game():
     global scroll_pos, player_truck, enemies_up, enemies_down, spawn_timer_up, spawn_timer_down, player_name, asking_for_name, new_high_score, police_car,  holes, hole_spawn_timer, oil_stains, oil_stain_spawn_timer, beer_collectibles, beer_spawn_timer, invulnerability_powerups, invulnerability_spawn_timer, score_indicators, pending_score_bonus, beer_bonus_points, last_police_spawn_time
@@ -937,7 +887,8 @@ def main():
                 if menu_state.active_menu == "main":
                     # Obtém todos os recordes para exibir o top 3
                     top_scores = high_score_manager.get_top_scores()
-                    draw_start_menu(menu_state, mouse_x, mouse_y, {"scores": top_scores, "highest": high_score_manager.get_highest_score()})
+                    draw_start_menu(menu_state, mouse_x, mouse_y,
+                                    {"scores": top_scores, "highest": high_score_manager.get_highest_score()})
                 elif menu_state.active_menu == "instructions":
                     draw_instructions_screen(menu_state, mouse_x, mouse_y)
             else:  # GAME_STATE_GAME_OVER
@@ -949,7 +900,8 @@ def main():
                     draw_name_input_screen(menu_state, mouse_x, mouse_y, player_name)
                 else:
                     # Tela normal de game over
-                    draw_game_over_menu(final_score, menu_state, mouse_x, mouse_y, top_scores, new_high_score, player_name)
+                    draw_game_over_menu(final_score, menu_state, mouse_x, mouse_y, top_scores, new_high_score,
+                                        player_name)
 
         elif current_game_state == GAME_STATE_PLAYING:
             # --- Game Viewport (scaled) ---
@@ -961,27 +913,27 @@ def main():
             glLoadIdentity()
 
             draw_road(scroll_pos)
-            
+
             # Desenha os buracos e manchas primeiro (para ficarem "abaixo" dos carros)
             for hole in holes:
                 hole.draw()
-                
+
             # Desenha as manchas de óleo
             for oil_stain in oil_stains:
                 oil_stain.draw()
-                
+
             # Desenha as cervejas colecionáveis
             for beer in beer_collectibles:
                 beer.draw()
-                
+
             # Desenha os indicadores de pontos
             for indicator in score_indicators:
                 indicator.draw()
-                
+
             # Desenha os power-ups de invulnerabilidade
             for powerup in invulnerability_powerups:
                 powerup.draw()
-                
+
             player_truck.draw()
             for enemy in enemies_up:
                 enemy.draw()
@@ -1003,7 +955,7 @@ def main():
             # Painel lateral - fundo
             draw_rect(0, 0, PANEL_WIDTH, SCREEN_HEIGHT, COLOR_PANEL)
             time_elapsed = glfw.get_time()
-            
+
             # Calcula a velocidade considerando o efeito do buraco com transição suave
             base_speed = abs(scroll_speed * 400)
             if player_truck.slowed_down:
@@ -1011,14 +963,14 @@ def main():
                 displayed_speed = base_speed * player_truck.current_speed_factor
             else:
                 displayed_speed = base_speed
-            
+
             score = abs(scroll_pos * 0.1) + beer_bonus_points
 
             # Top stats
             draw_text(f"Time: {int(time_elapsed)}", 12, SCREEN_HEIGHT - 28)
             draw_text(f"Speed: {displayed_speed:.0f} km/h", 12, SCREEN_HEIGHT - 52)
             draw_text(f"Score: {int(score)}", 12, SCREEN_HEIGHT - 76)
-            
+
             # Exibe as vidas usando corações desenhados geometricamente
             draw_text("Lives:", 12, SCREEN_HEIGHT - 100)
             lives_x = 80
@@ -1032,13 +984,13 @@ def main():
                         color = (1.0, 0.3, 0.3)  # Vermelho
                 else:
                     color = (1.0, 0.3, 0.3)  # Vermelho normal
-                
+
                 draw_heart(lives_x + i * 25, SCREEN_HEIGHT - 95, size=10, color=color, filled=True)
-            
+
             # Desenha corações vazios para vidas perdidas
             for i in range(player_truck.lives, 3):
                 draw_heart(lives_x + i * 25, SCREEN_HEIGHT - 95, size=10, color=(0.5, 0.5, 0.5), filled=False)
-            
+
             # Reseta a cor para branco
             glColor3f(1.0, 1.0, 1.0)
 
@@ -1120,6 +1072,75 @@ def main():
             # Mode / ajuda de teclas
             mode_text = "MODE: MANUAL (F7)" if difficulty_info['manual_control'] else "MODE: AUTO (F7)"
             draw_text(mode_text, 12, y0)
+
+        elif current_game_state == GAME_STATE_PAUSED:
+            # --- 1. DESENHA O JOGO PAUSADO NO FUNDO ---
+            # A lógica de desenho é a mesma do estado 'PLAYING', mas sem a lógica de update.
+
+            # --- Game Viewport (scaled) ---
+            glViewport(game_vp[0], game_vp[1], game_vp[2], game_vp[3])
+            glMatrixMode(GL_PROJECTION)
+            glLoadIdentity()
+            gluOrtho2D(0, BASE_GAME_WIDTH, 0, BASE_HEIGHT)
+            glMatrixMode(GL_MODELVIEW)
+            glLoadIdentity()
+
+            draw_road(scroll_pos)
+
+            for hole in holes: hole.draw()
+            for oil_stain in oil_stains: oil_stain.draw()
+            for beer in beer_collectibles: beer.draw()
+            for indicator in score_indicators: indicator.draw()
+            for powerup in invulnerability_powerups: powerup.draw()
+
+            player_truck.draw()
+            for enemy in enemies_up: enemy.draw()
+            for enemy in enemies_down: enemy.draw()
+            if police_car: police_car.draw()
+
+            # --- Panel Viewport (scaled) ---
+            glViewport(panel_vp[0], panel_vp[1], panel_vp[2], panel_vp[3])
+            glMatrixMode(GL_PROJECTION)
+            glLoadIdentity()
+            gluOrtho2D(0, BASE_PANEL_WIDTH, 0, BASE_HEIGHT)
+            glMatrixMode(GL_MODELVIEW)
+            glLoadIdentity()
+
+            # Re-desenha o painel lateral para que ele também fique visível
+            draw_rect(0, 0, PANEL_WIDTH, SCREEN_HEIGHT, COLOR_PANEL)
+            time_elapsed = glfw.get_time()
+            base_speed = abs(scroll_speed * 400)
+            displayed_speed = base_speed * player_truck.current_speed_factor if player_truck.slowed_down else base_speed
+            score = abs(scroll_pos * 0.1) + beer_bonus_points
+
+            draw_text(f"Time: {int(time_elapsed)}", 12, SCREEN_HEIGHT - 28)
+            draw_text(f"Speed: {displayed_speed:.0f} km/h", 12, SCREEN_HEIGHT - 52)
+            draw_text(f"Score: {int(score)}", 12, SCREEN_HEIGHT - 76)
+            draw_text("Lives:", 12, SCREEN_HEIGHT - 100)
+            lives_x = 80
+            for i in range(player_truck.lives):
+                draw_heart(lives_x + i * 25, SCREEN_HEIGHT - 95, size=10, color=(1.0, 0.3, 0.3), filled=True)
+            for i in range(player_truck.lives, 3):
+                draw_heart(lives_x + i * 25, SCREEN_HEIGHT - 95, size=10, color=(0.5, 0.5, 0.5), filled=False)
+            glColor3f(1.0, 1.0, 1.0)
+
+            # --- 2. DESENHA O MENU DE PAUSA POR CIMA ---
+            # Configura a viewport para cobrir toda a área de conteúdo
+            glViewport(content_vp[0], content_vp[1], content_vp[2], content_vp[3])
+            glMatrixMode(GL_PROJECTION)
+            glLoadIdentity()
+            gluOrtho2D(0, BASE_TOTAL_WIDTH, 0, BASE_HEIGHT)
+            glMatrixMode(GL_MODELVIEW)
+            glLoadIdentity()
+
+            # Converte as coordenadas do mouse para o sistema lógico do menu
+            mouse_px, mouse_py = glfw.get_cursor_pos(window)
+            inv_mouse_py = fb_height - mouse_py
+            safe_scale = scale if scale and scale > 0.0 else 1e-6
+            mouse_x = (mouse_px - offset_x) / safe_scale
+            mouse_y = (inv_mouse_py - offset_y) / safe_scale
+
+            draw_pause_menu(menu_state, mouse_x, mouse_y)
 
         glfw.swap_buffers(window)
 
