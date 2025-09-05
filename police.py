@@ -1,6 +1,6 @@
 # Ficheiro: police.py
 from OpenGL.GL import *
-from road import SCREEN_HEIGHT, ROAD_WIDTH, GAME_WIDTH
+from road import SCREEN_HEIGHT, ROAD_WIDTH, GAME_WIDTH, PLAYER_SPEED
 import random
 import threading
 import audio_manager
@@ -124,10 +124,15 @@ class PoliceCar:
 
         self._animate()
 
-        # Movimento vertical e perseguição horizontal
-        self.y += self.speed_y
+        # Ajuste da velocidade com base no scroll_speed atual
+        base_scroll_factor = abs(scroll_speed) / PLAYER_SPEED
+        effective_speed_y = self.speed_y * base_scroll_factor
+        effective_chase_speed_x = self.chase_speed_x * base_scroll_factor
+
+        # Movimento vertical e perseguição horizontal com velocidades adaptativas
+        self.y += effective_speed_y
         target_x = player_truck.x
-        self.x += (target_x - self.x) * self.chase_speed_x
+        self.x += (target_x - self.x) * effective_chase_speed_x
 
         road_x_start = (GAME_WIDTH - ROAD_WIDTH) / 2
         min_x = road_x_start
