@@ -2,7 +2,7 @@ import ctypes
 from OpenGL.GL import *
 from OpenGL.GLU import *
 from OpenGL.GLUT import *
-from OpenGL.GLUT import GLUT_BITMAP_HELVETICA_18, GLUT_BITMAP_TIMES_ROMAN_24
+from OpenGL.GLUT import GLUT_BITMAP_HELVETICA_18, GLUT_BITMAP_TIMES_ROMAN_24, GLUT_BITMAP_HELVETICA_12
 from road import SCREEN_WIDTH, SCREEN_HEIGHT, draw_rect
 import high_score_manager  # Importa o gerenciador de recordes
 
@@ -180,39 +180,79 @@ def draw_start_menu(menu_state, mouse_x, mouse_y, high_score_data=None):
 
 
 def draw_instructions_screen(menu_state, mouse_x, mouse_y):
-    """Desenha a tela de instruções e registra o botão de voltar."""
+    """Desenha a tela de instruções em duas colunas."""
     draw_menu_background()
-    menu_state.clickable_areas.clear()  # <-- 1. Limpa áreas da tela anterior
+    menu_state.clickable_areas.clear()
 
-    title_y = SCREEN_HEIGHT - 100
+    title_y = SCREEN_HEIGHT - 70
     draw_text_centered("COMO JOGAR", SCREEN_WIDTH / 2, title_y, font=GLUT_BITMAP_TIMES_ROMAN_24, color=COLOR_TITLE)
 
-    instructions_y = SCREEN_HEIGHT / 2 + 100
-    instructions = [
-        "Controles:",
-        "Seta ESQUERDA/DIREITA - Mover o caminhão",
-        "Seta CIMA - Acelerar",
-        "Seta BAIXO - Frear",
-        "ESC - Pausar / Voltar ao menu",
+    # --- Configurações para as Colunas ---
+    column_margin = 50
+    column_width = (SCREEN_WIDTH / 2) - column_margin
+    left_column_x = column_margin + 20 # Ajuste para o texto não colar na borda
+    right_column_x = SCREEN_WIDTH / 2 + 20
+
+    start_y = SCREEN_HEIGHT - 120
+    line_height = 20
+    instruction_font = GLUT_BITMAP_HELVETICA_12
+
+    # Instruções divididas em duas listas (para as colunas)
+    # Coluna Esquerda
+    left_column_instructions = [
+        "--- CONTROLES ---",
+        "Teclado:",
+        "Setas Direcionais: Mover/Acelerar/Frear",
+        "Barra de Espaço: Buzina",
+        "ESC: Pausar / Voltar ao Menu",
+        "Alt + Enter: Alternar Tela Cheia",
         "",
-        "Objetivo:",
-        "Desvie dos carros e sobreviva o máximo que puder!",
+        "Joystick:",
+        "Analógico / D-Pad: Mover/Acelerar/Frear",
+        "",
+        "--- OBJETIVO ---",
+        "Sobreviva o máximo possível!",
+        "Desvie de carros, buracos e óleo.",
+        "Colete cervejas e power-ups.",
+        "Sua pontuação aumenta com a distância."
     ]
 
-    for i, line in enumerate(instructions):
-        draw_text_centered(line, SCREEN_WIDTH / 2, instructions_y - i * 30, font=GLUT_BITMAP_HELVETICA_18)
+    # Coluna Direita
+    right_column_instructions = [
+        "--- ELEMENTOS DA PISTA ---",
+        "Cerveja: Ganhe pontos extras!",
+        "Mancha de Óleo: Controles invertidos por um tempo.",
+        "Buraco: Velocidade reduzida temporariamente.",
+        "Escudo (Power-up): Invencibilidade a batidas.",
+        "",
+        "--- INIMIGOS ---",
+        "Outros Veículos: Desvie ou bata neles (cuidado!).",
+        "Polícia: Vão te perseguir e tentar te parar!",
+        "Evite colisões para não perder vidas!"
+    ]
 
-    # Botão de Voltar
+    # Desenhar Coluna Esquerda
+    current_y = start_y
+    for line in left_column_instructions:
+        draw_text(line, left_column_x, current_y, font=instruction_font)
+        current_y -= line_height
+
+    # Desenhar Coluna Direita
+    current_y = start_y
+    for line in right_column_instructions:
+        draw_text(line, right_column_x, current_y, font=instruction_font)
+        current_y -= line_height
+
+    # Botão de Voltar (centralizado abaixo das duas colunas)
     button_width = 200
     button_height = 50
     button_x = (SCREEN_WIDTH - button_width) / 2
-    button_y = 100
+    button_y = 40
 
     is_hovered = (button_x <= mouse_x <= button_x + button_width and
                   button_y <= mouse_y <= button_y + button_height)
     is_pressed = is_hovered and menu_state.mouse_pressed
 
-    # <-- 2. Registra a área clicável do botão VOLTAR
     rect = (button_x, button_y, button_width, button_height)
     menu_state.clickable_areas.append({'rect': rect, 'action': 'main'})
 
