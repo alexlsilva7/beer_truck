@@ -135,9 +135,19 @@ class Truck:
 
         self.y += dy * actual_speed_y
 
-        # Reset se sair da tela
-        if self.y > SCREEN_HEIGHT or self.y + self.height < 0:
-            self.reset()
+        # Lógica para quando o caminhão sai da tela
+        if not self.crashed:
+            # Saiu por cima
+            if self.y > SCREEN_HEIGHT:
+                self.lose_life_off_screen()
+                if self.lives > 0:
+                    self.respawn()  # Respawn imediato
+                else:
+                    # Game Over: move o caminhão para fora da tela para acionar a lógica em main.py
+                    self.y = -self.height - 1
+            # Saiu por baixo
+            elif self.y + self.height < 0:
+                self.take_damage()  # Comportamento original: crash e queda
 
     def check_collision(self, other):
         """Verifica a colisão com outro objeto (inimigo)."""
@@ -213,6 +223,14 @@ class Truck:
             self.crashed = True
             return True  # Indica que tomou dano
         return False  # Não tomou dano (já estava invulnerável)
+
+    def lose_life_off_screen(self):
+        """O caminhão perde uma vida por sair da tela, ignorando invulnerabilidade."""
+        if self.lives > 0:
+            self.lives -= 1
+        
+        if self.lives == 0:
+            self.crashed = True
 
     def respawn(self):
         """Reseta a posição e o estado do caminhão para o respawn, concedendo invulnerabilidade."""
