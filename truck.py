@@ -266,6 +266,12 @@ class Truck:
         self.invulnerable = True
         self.armored = True
         self.invulnerable_start_time = time.time()
+        
+        # Limpa os efeitos negativos
+        self.slowed_down = False
+        self.current_speed_factor = 1.0
+        self.controls_inverted = False
+        
         return True  # Indica que o power-up foi aplicado
 
     def reset(self):

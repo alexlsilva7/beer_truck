@@ -732,8 +732,9 @@ def main():
                 if hole.active and player_truck.check_hole_collision(hole):
                     # Buraco desaparece após uso
                     hole.active = False
-                    # Aplica efeito de diminuição de velocidade
-                    player_truck.slow_down()
+                    # Aplica efeito de diminuição de velocidade somente se não estiver invulnerável
+                    if not player_truck.invulnerable:
+                        player_truck.slow_down()
             
             # Remove buracos que saíram da tela ou foram usados
             holes = [h for h in holes if h.active and h.y > -h.height]
@@ -784,8 +785,9 @@ def main():
                 if oil_stain.active and player_truck.check_oil_stain_collision(oil_stain):
                     # Mancha desaparece após uso
                     oil_stain.active = False
-                    # Aplica efeito de inversão de controles
-                    player_truck.invert_controls()
+                    # Aplica efeito de inversão de controles somente se não estiver invulnerável
+                    if not player_truck.invulnerable:
+                        player_truck.invert_controls()
             
             # Remove manchas que saíram da tela ou foram usadas
             oil_stains = [o for o in oil_stains if o.active and o.y > -o.height]
