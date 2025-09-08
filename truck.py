@@ -4,11 +4,15 @@ import time
 
 
 class Truck:
-    def __init__(self, texture_id, dead_texture_id=None, armored_texture_id=None):
+    def __init__(self, texture_id, dead_texture_id=None, armored_texture_id=None, 
+                 hole_texture_id=None, oil_texture_id=None, hole_and_oil_texture_id=None):
         """Inicializa as propriedades do caminhão."""
         self.texture_id = texture_id
         self.dead_texture_id = dead_texture_id
         self.armored_texture_id = armored_texture_id  # Textura do carro blindado
+        self.hole_texture_id = hole_texture_id  # Textura do caminhão com efeito de buraco
+        self.oil_texture_id = oil_texture_id  # Textura do caminhão com efeito de óleo
+        self.hole_and_oil_texture_id = hole_and_oil_texture_id  # Textura do caminhão com ambos efeitos
         self.width = 50
         self.height = 100
         self.x = (GAME_WIDTH - self.width) / 2
@@ -65,14 +69,30 @@ class Truck:
         glEnable(GL_BLEND)
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
 
-        # Usa textura "dead" se o caminhão colidiu e tem textura dead
-        # Usa textura "armored" se está blindado
+        # Seleciona a textura apropriada com base no estado do caminhão
+        current_texture = self.texture_id  # Textura padrão
+
         if self.crashed and self.dead_texture_id:
+            # Caminhão batido/morto
             current_texture = self.dead_texture_id
         elif self.armored and self.armored_texture_id:
+            # Caminhão blindado (invulnerável com power-up)
             current_texture = self.armored_texture_id
-        else:
-            current_texture = self.texture_id
+        elif not self.invulnerable:
+            # Só aplica efeitos visuais se não estiver invulnerável
+            if self.slowed_down and self.controls_inverted:
+                # Ambos efeitos: buraco + óleo
+                if self.hole_and_oil_texture_id:
+                    current_texture = self.hole_and_oil_texture_id
+            elif self.slowed_down:
+                # Apenas efeito de buraco
+                if self.hole_texture_id:
+                    current_texture = self.hole_texture_id
+            elif self.controls_inverted:
+                # Apenas efeito de óleo
+                if self.oil_texture_id:
+                    current_texture = self.oil_texture_id
+            
         glBindTexture(GL_TEXTURE_2D, current_texture)
 
         # Efeito visual baseado no estado do caminhão
@@ -86,15 +106,8 @@ class Truck:
             blink_speed = 6  # Velocidade do piscar
             alpha = 0.5 + 0.5 * abs((time.time() * blink_speed) % 2 - 1)
             glColor4f(1.0, 1.0, 1.0, alpha)
-        elif self.slowed_down:
-            # Efeito visual para quando está com velocidade reduzida (cor azulada)
-            glColor4f(0.7, 0.7, 1.0, 1.0)
-        elif self.controls_inverted:
-            # Efeito visual para quando os controles estão invertidos (cor avermelhada)
-            blink_speed = 4  # Velocidade do piscar mais lento
-            red_intensity = 0.7 + 0.3 * abs((time.time() * blink_speed) % 2 - 1)
-            glColor4f(1.0, 0.5 * red_intensity, 0.5 * red_intensity, 1.0)
         else:
+            # Estado normal - cor branca sem efeitos
             glColor4f(1.0, 1.0, 1.0, 1.0)
 
         glBegin(GL_QUADS)
@@ -246,6 +259,10 @@ class Truck:
         
     def slow_down(self):
         """O caminhão sofre um efeito de diminuição de velocidade."""
+        # Não aplica o efeito se estiver invulnerável
+        if self.invulnerable:
+            return False
+            
         if not self.slowed_down:
             self.slowed_down = True
             self.slow_down_start_time = time.time()
@@ -255,6 +272,10 @@ class Truck:
         
     def invert_controls(self):
         """O caminhão sofre um efeito de inversão de controles."""
+        # Não aplica o efeito se estiver invulnerável
+        if self.invulnerable:
+            return False
+            
         if not self.controls_inverted:
             self.controls_inverted = True
             self.controls_inverted_start_time = time.time()
