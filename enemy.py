@@ -36,7 +36,7 @@ class Enemy:
         self.x = lane_x_start + (LANE_WIDTH - self.width) / 2
         self.y = SCREEN_HEIGHT
 
-    def update(self, all_enemies):
+    def update(self, all_enemies, speed_multiplier=1.0):
         """Move o inimigo e evita colisões com outros inimigos."""
         if self.crashed:
             return
@@ -54,7 +54,8 @@ class Enemy:
                     if self.speed_y > other.speed_y:
                         self.speed_y = other.speed_y
 
-        self.y -= self.speed_y
+        # Aplica o multiplicador de velocidade adicional (usado quando o player está crashado)
+        self.y -= self.speed_y * speed_multiplier
 
     def draw(self):
         """Desenha o inimigo na tela usando sua textura."""
