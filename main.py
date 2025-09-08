@@ -80,6 +80,7 @@ def toggle_borderless(window):
 scroll_pos = 0.0
 scroll_speed = -PLAYER_SPEED
 safety_distance = 180
+CRASH_SCROLL_MULTIPLIER = 2.0  # Multiplicador de velocidade durante respawn (2x mais rápido)
 difficulty_manager = DifficultyManager()
 high_score_manager = HighScoreManager()
 current_game_state = GAME_STATE_MENU
@@ -543,7 +544,8 @@ def main():
             else:
                 # --- LÓGICA DE CRASH / RESPAWN / GAME OVER ---
                 # Empurra o caminhão com o scroll quando está crashado
-                player_truck.y += scroll_speed
+                # MODIFICAÇÃO: Acelera a velocidade de scroll durante o período de crash
+                player_truck.y += scroll_speed * CRASH_SCROLL_MULTIPLIER
 
                 # Só continua para a próxima etapa (respawn ou game over) quando o caminhão saiu da tela E
                 # todos os inimigos marcados como crashados também já tiverem saído.
@@ -575,7 +577,12 @@ def main():
                             new_high_score = high_score_manager.is_high_score(final_score)
                             if new_high_score:
                                 asking_for_name = True
-            scroll_pos += scroll_speed
+            
+            # Acelera a rolagem do cenário quando o caminhão está crashado
+            if player_truck.crashed:
+                scroll_pos += scroll_speed * CRASH_SCROLL_MULTIPLIER
+            else:
+                scroll_pos += scroll_speed
 
             # --- Police Spawning ---
             if police_car is None and score > POLICE_SPAWN_SCORE_THRESHOLD:
@@ -601,7 +608,12 @@ def main():
 
             # --- Police Update ---
             if police_car:
-                police_car.update(player_truck, enemies_up + enemies_down, scroll_speed)
+                # Só acelera o carro da polícia se o jogador estiver crashado, mesmo que a polícia esteja crashada
+                if player_truck.crashed:
+                    police_car.update(player_truck, enemies_up + enemies_down, scroll_speed * CRASH_SCROLL_MULTIPLIER)
+                else:
+                    police_car.update(player_truck, enemies_up + enemies_down, scroll_speed)
+                
                 # Se a polícia sair da tela por cima ou por baixo, remove-a
                 if police_car.y > SCREEN_HEIGHT or police_car.y + police_car.height < 0:
                     try:
@@ -613,7 +625,12 @@ def main():
                     police_car = None
 
             # --- Enemy Spawning ---
-            spawn_timer_up += 0.1
+            # Aplica o multiplicador de crash ao timer de spawn quando o player está crashado
+            if player_truck.crashed:
+                spawn_timer_up += 0.1 * CRASH_SCROLL_MULTIPLIER
+            else:
+                spawn_timer_up += 0.1
+                
             if spawn_timer_up >= current_spawn_rate:
                 spawn_timer_up = 0
                 up_lanes = range(LANE_COUNT_PER_DIRECTION, LANE_COUNT_PER_DIRECTION * 2)
@@ -623,7 +640,12 @@ def main():
                     normal_texture, dead_texture = random.choice(enemy_up_texture_pairs)
                     enemies_up.append(Enemy(normal_texture, dead_texture, lane_index=chosen_lane, speed_multiplier=enemy_speed_multiplier))
 
-            spawn_timer_down += 0.15
+            # Aplica o multiplicador de crash ao timer de spawn quando o player está crashado
+            if player_truck.crashed:
+                spawn_timer_down += 0.15 * CRASH_SCROLL_MULTIPLIER
+            else:
+                spawn_timer_down += 0.15
+                
             if spawn_timer_down >= current_spawn_rate:
                 spawn_timer_down = 0
                 down_lanes = range(0, LANE_COUNT_PER_DIRECTION)
@@ -636,7 +658,12 @@ def main():
             # --- Enemy Update & Collision ---
             all_enemies = enemies_up + enemies_down
             for enemy in all_enemies:
-                enemy.update(all_enemies)
+                # Passa o multiplicador de velocidade quando o player está crashado
+                if player_truck.crashed:
+                    enemy.update(all_enemies, CRASH_SCROLL_MULTIPLIER)
+                else:
+                    enemy.update(all_enemies)
+                    
                 # Marca inimigos que colidem com o caminhão
                 if not enemy.crashed and player_truck.check_collision(enemy):
                     # O inimigo sempre fica crashed quando há colisão
@@ -652,10 +679,19 @@ def main():
                 
                 # inimigos crashados continuam sendo empurrados pelo scroll
                 if enemy.crashed:
-                    enemy.y += scroll_speed
+                    # Só acelera se o player estiver crashado
+                    if player_truck.crashed:
+                        enemy.y += scroll_speed * CRASH_SCROLL_MULTIPLIER
+                    else:
+                        enemy.y += scroll_speed
                     
             # --- Hole Spawning ---
-            hole_spawn_timer += 0.3  # Aumentado para incrementar mais rapidamente o timer
+            # Acelera o timer de spawn quando o player está crashado
+            if player_truck.crashed:
+                hole_spawn_timer += 0.3 * CRASH_SCROLL_MULTIPLIER  # Acelerado durante crash
+            else:
+                hole_spawn_timer += 0.3  # Timer normal
+                
             hole_spawn_rate = current_spawn_rate * 0.5  # Reduzido drasticamente para buracos aparecerem muito mais frequentemente
             current_hole_probability = difficulty_manager.get_current_hole_spawn_probability()
             
@@ -687,7 +723,12 @@ def main():
             
             # --- Hole Update & Collision ---
             for hole in holes:
-                hole.update(scroll_speed)  # Passa a velocidade atual de rolagem
+                # Usa velocidade acelerada durante crash para manter todos objetos em sincronia
+                if player_truck.crashed:
+                    hole.update(scroll_speed * CRASH_SCROLL_MULTIPLIER)
+                else:
+                    hole.update(scroll_speed)
+                    
                 if hole.active and player_truck.check_hole_collision(hole):
                     # Buraco desaparece após uso
                     hole.active = False
@@ -698,7 +739,12 @@ def main():
             holes = [h for h in holes if h.active and h.y > -h.height]
             
             # --- Oil Stain Spawning ---
-            oil_stain_spawn_timer += 0.3  # Incrementa o timer para spawn
+            # Acelera o timer durante crash
+            if player_truck.crashed:
+                oil_stain_spawn_timer += 0.3 * CRASH_SCROLL_MULTIPLIER
+            else:
+                oil_stain_spawn_timer += 0.3  # Incrementa o timer para spawn
+                
             oil_stain_spawn_rate = current_spawn_rate * 0.6  # Taxa de spawn um pouco mais lenta que os buracos
             current_oil_stain_probability = difficulty_manager.get_current_oil_stain_spawn_probability()
             
@@ -729,7 +775,12 @@ def main():
             
             # --- Oil Stain Update & Collision ---
             for oil_stain in oil_stains:
-                oil_stain.update(scroll_speed)  # Passa a velocidade atual de rolagem
+                # Usa velocidade acelerada durante crash para manter todos objetos em sincronia
+                if player_truck.crashed:
+                    oil_stain.update(scroll_speed * CRASH_SCROLL_MULTIPLIER)
+                else:
+                    oil_stain.update(scroll_speed)
+                    
                 if oil_stain.active and player_truck.check_oil_stain_collision(oil_stain):
                     # Mancha desaparece após uso
                     oil_stain.active = False
@@ -740,7 +791,12 @@ def main():
             oil_stains = [o for o in oil_stains if o.active and o.y > -o.height]
             
             # --- Beer Collectible Spawning ---
-            beer_spawn_timer += 0.4  # Incrementa o timer para spawn (um pouco mais lento)
+            # Acelera o timer durante crash
+            if player_truck.crashed:
+                beer_spawn_timer += 0.4 * CRASH_SCROLL_MULTIPLIER
+            else:
+                beer_spawn_timer += 0.4  # Incrementa o timer para spawn (um pouco mais lento)
+                
             beer_spawn_rate = current_spawn_rate * 1.5  # Taxa de spawn mais lenta que buracos e óleo
             
             if beer_spawn_timer >= beer_spawn_rate:
@@ -764,7 +820,11 @@ def main():
             
             # --- Beer Collectible Update & Collision ---
             for beer in beer_collectibles:
-                beer.update(scroll_speed)  # Passa a velocidade atual de rolagem
+                # Usa velocidade acelerada durante crash para manter todos objetos em sincronia
+                if player_truck.crashed:
+                    beer.update(scroll_speed * CRASH_SCROLL_MULTIPLIER)
+                else:
+                    beer.update(scroll_speed)  # Passa a velocidade atual de rolagem
                 if beer.active and beer.check_collision(player_truck):
                     # Cerveja é coletada e jogador ganha pontos
                     points_gained = beer.collect()
@@ -788,12 +848,26 @@ def main():
             
             # --- Score Indicators Update ---
             for indicator in score_indicators:
-                indicator.update()
+                # Acelera a animação dos indicadores de pontuação durante o crash
+                if player_truck.crashed:
+                    # Acessa e modifica a velocidade diretamente para este frame
+                    original_velocity = indicator.velocity_y
+                    indicator.velocity_y *= CRASH_SCROLL_MULTIPLIER
+                    indicator.update()
+                    # Restaura a velocidade original para o próximo frame
+                    indicator.velocity_y = original_velocity
+                else:
+                    indicator.update()
             # Remove indicadores inativos
             score_indicators = [i for i in score_indicators if i.active]
             
             # --- Invulnerability Power-Up Spawning ---
-            invulnerability_spawn_timer += 0.2  # Incrementa o timer para spawn (mais lento)
+            # Acelera o timer durante crash
+            if player_truck.crashed:
+                invulnerability_spawn_timer += 0.2 * CRASH_SCROLL_MULTIPLIER  # Acelerado
+            else:
+                invulnerability_spawn_timer += 0.2  # Incrementa o timer para spawn (mais lento)
+                
             invulnerability_spawn_rate = current_spawn_rate * 2.0  # Taxa de spawn muito mais lenta que outros elementos
             current_invulnerability_probability = difficulty_manager.get_current_invulnerability_spawn_probability()
             
@@ -824,7 +898,11 @@ def main():
             
             # --- Invulnerability Power-Up Update & Collision ---
             for powerup in invulnerability_powerups:
-                powerup.update(scroll_speed)  # Passa a velocidade atual de rolagem
+                # Usa velocidade acelerada durante crash para manter todos objetos em sincronia
+                if player_truck.crashed:
+                    powerup.update(scroll_speed * CRASH_SCROLL_MULTIPLIER)
+                else:
+                    powerup.update(scroll_speed)  # Passa a velocidade atual de rolagem
                 if powerup.active and player_truck.check_invulnerability_powerup_collision(powerup):
                     # Power-up desaparece após uso
                     powerup.active = False
