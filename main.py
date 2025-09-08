@@ -382,6 +382,9 @@ def main():
     truck_texture = load_texture(os.path.join(script_dir, "assets/veiculos/protagonista/truck.png"))
     truck_dead_texture = load_texture(os.path.join(script_dir, "assets/veiculos/protagonista/truck_dead.png"))
     truck_armored_texture = load_texture(os.path.join(script_dir, "assets/veiculos/protagonista/armored_truck.png"))
+    truck_hole_texture = load_texture(os.path.join(script_dir, "assets/veiculos/protagonista/hole.png"))
+    truck_oil_texture = load_texture(os.path.join(script_dir, "assets/veiculos/protagonista/oil.png"))
+    truck_hole_and_oil_texture = load_texture(os.path.join(script_dir, "assets/veiculos/protagonista/hole and oil.png"))
     enemy_textures_up = [load_texture(os.path.join(script_dir, f"assets/veiculos/up_{color}.png")) for color in ["black", "green", "red", "yellow"]]
     enemy_textures_down = [load_texture(os.path.join(script_dir, f"assets/veiculos/down_{color}.png")) for color in ["black", "green", "red", "yellow"]]
     enemy_dead_textures_up = [load_texture(os.path.join(script_dir, f"assets/veiculos/up_{color}_dead.png")) for color in ["black", "green", "red", "yellow"]]
@@ -408,11 +411,15 @@ def main():
     except Exception as e:
         print(f"Erro ao pré-carregar áudios: {e}")
     
-    if not all([truck_texture, truck_dead_texture, truck_armored_texture, hole_texture, oil_texture, beer_texture, invulnerability_texture] + enemy_textures_up + enemy_textures_down + enemy_dead_textures_up + enemy_dead_textures_down + list(police_textures.values())):
+    if not all([truck_texture, truck_dead_texture, truck_armored_texture, truck_hole_texture, truck_oil_texture, truck_hole_and_oil_texture, 
+                hole_texture, oil_texture, beer_texture, invulnerability_texture] + 
+               enemy_textures_up + enemy_textures_down + enemy_dead_textures_up + enemy_dead_textures_down + 
+               list(police_textures.values())):
         glfw.terminate()
         sys.exit("Failed to load one or more textures.")
 
-    player_truck = Truck(truck_texture, truck_dead_texture, truck_armored_texture)
+    player_truck = Truck(truck_texture, truck_dead_texture, truck_armored_texture,
+                    truck_hole_texture, truck_oil_texture, truck_hole_and_oil_texture)
     enemies_up, enemies_down = [], []
     holes = []
     oil_stains = []
@@ -732,8 +739,9 @@ def main():
                 if hole.active and player_truck.check_hole_collision(hole):
                     # Buraco desaparece após uso
                     hole.active = False
-                    # Aplica efeito de diminuição de velocidade
-                    player_truck.slow_down()
+                    # Aplica efeito de diminuição de velocidade somente se não estiver invulnerável
+                    if not player_truck.invulnerable:
+                        player_truck.slow_down()
             
             # Remove buracos que saíram da tela ou foram usados
             holes = [h for h in holes if h.active and h.y > -h.height]
@@ -784,8 +792,9 @@ def main():
                 if oil_stain.active and player_truck.check_oil_stain_collision(oil_stain):
                     # Mancha desaparece após uso
                     oil_stain.active = False
-                    # Aplica efeito de inversão de controles
-                    player_truck.invert_controls()
+                    # Aplica efeito de inversão de controles somente se não estiver invulnerável
+                    if not player_truck.invulnerable:
+                        player_truck.invert_controls()
             
             # Remove manchas que saíram da tela ou foram usadas
             oil_stains = [o for o in oil_stains if o.active and o.y > -o.height]
