@@ -145,19 +145,20 @@ class PoliceCar:
         for target in potential_targets:
             if self._check_rear_end_collision(target):
                 if target is player_truck:
-                    # Se o player estiver invulnerável ou blindado, a polícia fica crashed; sempre toca som e para a sirene
-                    target.take_damage()
-                    self.crashed = True
-                    try:
-                        self.stop_audio()
-                    except Exception:
-                        pass
-                    try:
-                        audio_manager.play_one_shot("assets/sound/crash.wav")
-                    except Exception as e:
-                        print(f"Failed to play crash sound for police: {e}")
-                    if not (player_truck.invulnerable or player_truck.armored):
-                        target.crashed = True
+                    # Só processa colisão com o jogador se ele não estiver invulnerável (exceto quando blindado)
+                    if not target.invulnerable or target.armored:
+                        target.take_damage()
+                        self.crashed = True
+                        try:
+                            self.stop_audio()
+                        except Exception:
+                            pass
+                        try:
+                            audio_manager.play_one_shot("assets/sound/crash.wav")
+                        except Exception as e:
+                            print(f"Failed to play crash sound for police: {e}")
+                        if not target.armored:
+                            target.crashed = True
                 else:
                     target.crashed = True
                     try:

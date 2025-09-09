@@ -673,16 +673,18 @@ def main():
                     
                 # Marca inimigos que colidem com o caminhão
                 if not enemy.crashed and player_truck.check_collision(enemy):
-                    # O inimigo sempre fica crashed quando há colisão
-                    enemy.crashed = True
-                    # Reproduz som de colisão (reutiliza helper para evitar duplicação)
-                    try:
-                        audio_manager.play_one_shot("assets/sound/crash.wav", volume=0.7)
-                    except Exception as e:
-                        print(f"Erro ao tocar som de colisão: {e}")
-                    # O caminhão só toma dano se não estiver blindado
-                    if not player_truck.armored:
-                        player_truck.take_damage()
+                    # Só processa colisão se o jogador não estiver invulnerável (exceto quando blindado)
+                    if not player_truck.invulnerable or player_truck.armored:
+                        # O inimigo fica crashed quando há colisão válida
+                        enemy.crashed = True
+                        # Reproduz som de colisão (reutiliza helper para evitar duplicação)
+                        try:
+                            audio_manager.play_one_shot("assets/sound/crash.wav", volume=0.7)
+                        except Exception as e:
+                            print(f"Erro ao tocar som de colisão: {e}")
+                        # O caminhão só toma dano se não estiver blindado
+                        if not player_truck.armored:
+                            player_truck.take_damage()
                 
                 # inimigos crashados continuam sendo empurrados pelo scroll
                 if enemy.crashed:
