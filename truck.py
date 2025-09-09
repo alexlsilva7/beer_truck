@@ -230,12 +230,14 @@ class Truck:
 
     def take_damage(self):
         """O caminhão perde uma vida e inicia a sequência de 'crash'."""
-        if not self.invulnerable and self.lives > 0:
-            self.lives -= 1
-            # Sempre marca como 'crashed' para iniciar a sequência de limpeza de tela.
-            self.crashed = True
-            return True  # Indica que tomou dano
-        return False  # Não tomou dano (já estava invulnerável)
+        # Não pode tomar dano se já estiver crashed, invulnerável, ou sem vidas
+        if self.crashed or self.invulnerable or self.lives <= 0:
+            return False  # Não tomou dano
+            
+        self.lives -= 1
+        # Sempre marca como 'crashed' para iniciar a sequência de limpeza de tela.
+        self.crashed = True
+        return True  # Indica que tomou dano
 
     def lose_life_off_screen(self):
         """O caminhão perde uma vida por sair da tela, ignorando invulnerabilidade."""
