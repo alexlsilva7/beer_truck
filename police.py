@@ -120,7 +120,7 @@ class PoliceCar:
             except Exception:
                 pass
             self.y += scroll_speed
-            return
+            return None
 
         self._animate()
 
@@ -157,8 +157,13 @@ class PoliceCar:
                             audio_manager.play_one_shot("assets/sound/crash.wav")
                         except Exception as e:
                             print(f"Failed to play crash sound for police: {e}")
-                        if not target.armored:
+                        
+                        # Retorna informação de pontuação se o jogador está blindado
+                        if target.armored:
+                            return {"points_awarded": True, "points": 100, "x": self.x, "y": self.y}
+                        else:
                             target.crashed = True
+                            return None
                 else:
                     target.crashed = True
                     try:
@@ -170,3 +175,5 @@ class PoliceCar:
                     except Exception as e:
                         print(f"Failed to play crash sound for police: {e}")
                 break
+        
+        return None
