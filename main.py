@@ -617,9 +617,19 @@ def main():
             if police_car:
                 # Só acelera o carro da polícia se o jogador estiver crashado, mesmo que a polícia esteja crashada
                 if player_truck.crashed:
-                    police_car.update(player_truck, enemies_up + enemies_down, scroll_speed * CRASH_SCROLL_MULTIPLIER)
+                    police_result = police_car.update(player_truck, enemies_up + enemies_down, scroll_speed * CRASH_SCROLL_MULTIPLIER)
                 else:
-                    police_car.update(player_truck, enemies_up + enemies_down, scroll_speed)
+                    police_result = police_car.update(player_truck, enemies_up + enemies_down, scroll_speed)
+                
+                # Se a polícia retornou informações de pontuação (jogador blindado destruiu a polícia)
+                if police_result and police_result.get("points_awarded"):
+                    points_gained = police_result["points"]
+                    beer_bonus_points += points_gained
+                    
+                    # Cria indicador visual de pontos
+                    indicator_x = police_result["x"] + 25  # Centro da polícia (width/2)
+                    indicator_y = police_result["y"]
+                    score_indicators.append(ScoreIndicator(indicator_x, indicator_y, points_gained))
                 
                 # Se a polícia sair da tela por cima ou por baixo, remove-a
                 if police_car.y > SCREEN_HEIGHT or police_car.y + police_car.height < 0:
@@ -682,8 +692,18 @@ def main():
                             audio_manager.play_one_shot("assets/sound/crash.wav", volume=0.7)
                         except Exception as e:
                             print(f"Erro ao tocar som de colisão: {e}")
-                        # O caminhão só toma dano se não estiver blindado
-                        if not player_truck.armored:
+                        
+                        # Se o jogador está blindado (invulnerável com power-up), ganha pontos por destruir inimigos
+                        if player_truck.armored:
+                            points_gained = 100  # Mesmo valor que a cerveja
+                            beer_bonus_points += points_gained
+                            
+                            # Cria indicador visual de pontos (mesmo sistema da cerveja)
+                            indicator_x = enemy.x + enemy.width // 2
+                            indicator_y = enemy.y
+                            score_indicators.append(ScoreIndicator(indicator_x, indicator_y, points_gained))
+                        else:
+                            # O caminhão só toma dano se não estiver blindado
                             player_truck.take_damage()
                 
                 # inimigos crashados continuam sendo empurrados pelo scroll
