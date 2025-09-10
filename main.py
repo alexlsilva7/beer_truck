@@ -18,6 +18,7 @@ import police
 from hole import Hole
 from oil_stain import OilStain
 from beer_collectible import BeerCollectible
+from collision_utils import check_rect_collision
 from invulnerability import InvulnerabilityPowerUp
 from score_indicator import ScoreIndicator
 from texture_loader import load_texture
@@ -747,7 +748,28 @@ def main():
                     if not safe_lanes:
                         safe_lanes = all_lanes
                         
-                    chosen_lane = random.choice(safe_lanes)
+                    # Tenta encontrar uma lane onde o buraco não colida com manchas de óleo existentes
+                    collision_free_lanes = []
+                    for lane in safe_lanes:
+                        # Cria um buraco temporário para verificar colisões
+                        temp_hole = Hole(hole_texture, lane_index=lane, speed_multiplier=enemy_speed_multiplier)
+                        
+                        # Verifica se o buraco colide com alguma mancha de óleo
+                        collision = False
+                        for oil in oil_stains:
+                            if oil.active and temp_hole.check_collision_with_object(oil):
+                                collision = True
+                                break
+                                
+                        if not collision:
+                            collision_free_lanes.append(lane)
+                    
+                    # Se encontrou lanes sem colisão, usa-as, senão usa as lanes seguras originais
+                    if collision_free_lanes:
+                        chosen_lane = random.choice(collision_free_lanes)
+                    else:
+                        chosen_lane = random.choice(safe_lanes)
+                        
                     holes.append(Hole(hole_texture, lane_index=chosen_lane, speed_multiplier=enemy_speed_multiplier))
             
             # --- Hole Update & Collision ---
@@ -800,7 +822,28 @@ def main():
                     if not safe_lanes:
                         safe_lanes = all_lanes
                         
-                    chosen_lane = random.choice(safe_lanes)
+                    # Tenta encontrar uma lane onde a mancha não colida com buracos existentes
+                    collision_free_lanes = []
+                    for lane in safe_lanes:
+                        # Cria uma mancha temporária para verificar colisões
+                        temp_oil = OilStain(oil_texture, lane_index=lane, speed_multiplier=enemy_speed_multiplier)
+                        
+                        # Verifica se a mancha colide com algum buraco
+                        collision = False
+                        for hole in holes:
+                            if hole.active and temp_oil.check_collision_with_object(hole):
+                                collision = True
+                                break
+                                
+                        if not collision:
+                            collision_free_lanes.append(lane)
+                    
+                    # Se encontrou lanes sem colisão, usa-as, senão usa as lanes seguras originais
+                    if collision_free_lanes:
+                        chosen_lane = random.choice(collision_free_lanes)
+                    else:
+                        chosen_lane = random.choice(safe_lanes)
+                        
                     oil_stains.append(OilStain(oil_texture, lane_index=chosen_lane, speed_multiplier=enemy_speed_multiplier))
             
             # --- Oil Stain Update & Collision ---
