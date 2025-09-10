@@ -5,7 +5,7 @@ class DifficultyManager:
     def __init__(self):
         # Valores base (iniciais)
         self.base_scroll_speed = 0.18
-        self.base_spawn_rate = 1000
+        self.base_spawn_rate = 300  # Reduzido de 1000 para 300 para spawn mais frequente no início
         self.base_enemy_speed = 1.0
         self.base_hole_spawn_probability = 0.5  # 50% de chance (aumentado ainda mais)
         self.base_oil_stain_spawn_probability = 0.3  # 30% de chance inicial
