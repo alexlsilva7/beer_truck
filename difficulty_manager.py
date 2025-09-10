@@ -23,7 +23,7 @@ class DifficultyManager:
 
         # Taxas de aumento por segundo
         self.scroll_speed_increase_rate = 0.002
-        self.spawn_rate_decrease_rate = 0.011
+        self.spawn_rate_decrease_rate = 0.005
         self.enemy_speed_increase_rate = 0.004
         self.hole_spawn_increase_rate = 0.00006  # Reduzido para progressão mais lenta
         self.oil_stain_spawn_increase_rate = 0.00006  # Reduzido para progressão mais lenta
