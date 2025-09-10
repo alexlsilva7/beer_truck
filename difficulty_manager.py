@@ -7,8 +7,8 @@ class DifficultyManager:
         self.base_scroll_speed = 0.18
         self.base_spawn_rate = 300  # Reduzido de 1000 para 300 para spawn mais frequente no início
         self.base_enemy_speed = 1.0
-        self.base_hole_spawn_probability = 0.5  # 50% de chance (aumentado ainda mais)
-        self.base_oil_stain_spawn_probability = 0.3  # 30% de chance inicial
+        self.base_hole_spawn_probability = 0.35  # Aumentado para compensar a remoção do spawn forçado
+        self.base_oil_stain_spawn_probability = 0.35  # Aumentado para compensar a remoção do spawn forçado
         self.base_invulnerability_spawn_probability = 0.3  # Aumentado para 30% para facilitar testes
         self.base_beer_spawn_probability = 0.3  # 30% de chance inicial para cerveja
 
@@ -20,20 +20,13 @@ class DifficultyManager:
         self.oil_stain_spawn_probability = self.base_oil_stain_spawn_probability
         self.invulnerability_spawn_probability = self.base_invulnerability_spawn_probability
         self.beer_spawn_probability = self.base_beer_spawn_probability
-        
-        # Contador para forçar a criação de buracos
-        self.hole_spawn_counter = 0
-        # Contador para forçar a criação de manchas de óleo
-        self.oil_stain_spawn_counter = 0
-        # Contador para forçar a criação de power-ups de invulnerabilidade
-        self.invulnerability_spawn_counter = 0
 
         # Taxas de aumento por segundo
         self.scroll_speed_increase_rate = 0.002
         self.spawn_rate_decrease_rate = 0.011
         self.enemy_speed_increase_rate = 0.004
-        self.hole_spawn_increase_rate = 0.0005  # Aumento gradual da chance de buracos
-        self.oil_stain_spawn_increase_rate = 0.0003  # Aumento gradual da chance de manchas de óleo
+        self.hole_spawn_increase_rate = 0.00006  # Reduzido para progressão mais lenta
+        self.oil_stain_spawn_increase_rate = 0.00006  # Reduzido para progressão mais lenta
         self.invulnerability_spawn_increase_rate = 0.0001  # Aumento gradual da chance de power-ups
 
         # Limites máximos para evitar valores extremos
@@ -179,8 +172,6 @@ class DifficultyManager:
         self.oil_stain_spawn_probability = self.base_oil_stain_spawn_probability
         self.invulnerability_spawn_probability = self.base_invulnerability_spawn_probability
         self.beer_spawn_probability = self.base_beer_spawn_probability
-        self.hole_spawn_counter = 0
-        self.oil_stain_spawn_counter = 0
         self.invulnerability_spawn_counter = 0
         self.last_update_time = 0
 

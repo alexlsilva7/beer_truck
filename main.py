@@ -722,22 +722,13 @@ def main():
             else:
                 hole_spawn_timer += 0.3  # Timer normal
                 
-            hole_spawn_rate = current_spawn_rate * 0.5  # Reduzido drasticamente para buracos aparecerem muito mais frequentemente
+            hole_spawn_rate = current_spawn_rate
             current_hole_probability = difficulty_manager.get_current_hole_spawn_probability()
             
             if hole_spawn_timer >= hole_spawn_rate:
                 hole_spawn_timer = 0
-                # Verificação de probabilidade (com probabilidade garantida a cada X tentativas)
-                # Isso garante que um buraco vai aparecer eventualmente
-                static_spawn_counter = getattr(difficulty_manager, 'hole_spawn_counter', 0) + 1
-                difficulty_manager.hole_spawn_counter = static_spawn_counter
-                
-                # Força o spawn a cada 5 tentativas, independente da probabilidade
-                force_spawn = (static_spawn_counter >= 5)
-                if force_spawn:
-                    difficulty_manager.hole_spawn_counter = 0
-                
-                if force_spawn or random.random() < current_hole_probability:
+                # Agora usamos apenas a probabilidade para determinar o spawn
+                if random.random() < current_hole_probability:
                     # Pode aparecer em qualquer faixa
                     all_lanes = range(0, LANE_COUNT_PER_DIRECTION * 2)
                     # Relaxamos a restrição de segurança para permitir mais buracos
@@ -797,21 +788,13 @@ def main():
             else:
                 oil_stain_spawn_timer += 0.3  # Incrementa o timer para spawn
                 
-            oil_stain_spawn_rate = current_spawn_rate * 0.6  # Taxa de spawn um pouco mais lenta que os buracos
+            oil_stain_spawn_rate = current_spawn_rate
             current_oil_stain_probability = difficulty_manager.get_current_oil_stain_spawn_probability()
             
             if oil_stain_spawn_timer >= oil_stain_spawn_rate:
                 oil_stain_spawn_timer = 0
-                # Verificação de probabilidade (com probabilidade garantida a cada X tentativas)
-                static_spawn_counter = getattr(difficulty_manager, 'oil_stain_spawn_counter', 0) + 1
-                difficulty_manager.oil_stain_spawn_counter = static_spawn_counter
-                
-                # Força o spawn a cada 7 tentativas, independente da probabilidade
-                force_spawn = (static_spawn_counter >= 7)
-                if force_spawn:
-                    difficulty_manager.oil_stain_spawn_counter = 0
-                
-                if force_spawn or random.random() < current_oil_stain_probability:
+                # Agora usamos apenas a probabilidade para determinar o spawn
+                if random.random() < current_oil_stain_probability:
                     # Pode aparecer em qualquer faixa
                     all_lanes = range(0, LANE_COUNT_PER_DIRECTION * 2)
                     # Relaxamos a restrição de segurança para permitir mais manchas
