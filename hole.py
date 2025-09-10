@@ -4,6 +4,7 @@ import random
 import math
 import time
 from road import ROAD_WIDTH, GAME_WIDTH, SCREEN_HEIGHT, LANE_WIDTH, LANE_COUNT_PER_DIRECTION, PLAYER_SPEED
+from collision_utils import check_rect_collision
 
 
 class Hole:
@@ -70,3 +71,21 @@ class Hole:
         glEnd()
         
         glDisable(GL_BLEND)
+        
+    def check_collision_with_object(self, obj):
+        """
+        Verifica se este buraco colide com outro objeto (como uma mancha de óleo).
+        
+        Args:
+            obj: Objeto a verificar colisão (deve ter propriedades x, y, width, height)
+            
+        Returns:
+            True se colidir, False caso contrário
+        """
+        if not self.active or not obj.active:
+            return False
+            
+        return check_rect_collision(
+            self.x, self.y, self.width, self.height,
+            obj.x, obj.y, obj.width, obj.height
+        )

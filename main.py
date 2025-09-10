@@ -18,6 +18,7 @@ import police
 from hole import Hole
 from oil_stain import OilStain
 from beer_collectible import BeerCollectible
+from collision_utils import check_rect_collision
 from invulnerability import InvulnerabilityPowerUp
 from score_indicator import ScoreIndicator
 from texture_loader import load_texture
@@ -721,22 +722,13 @@ def main():
             else:
                 hole_spawn_timer += 0.3  # Timer normal
                 
-            hole_spawn_rate = current_spawn_rate * 0.5  # Reduzido drasticamente para buracos aparecerem muito mais frequentemente
+            hole_spawn_rate = current_spawn_rate
             current_hole_probability = difficulty_manager.get_current_hole_spawn_probability()
             
             if hole_spawn_timer >= hole_spawn_rate:
                 hole_spawn_timer = 0
-                # Verificação de probabilidade (com probabilidade garantida a cada X tentativas)
-                # Isso garante que um buraco vai aparecer eventualmente
-                static_spawn_counter = getattr(difficulty_manager, 'hole_spawn_counter', 0) + 1
-                difficulty_manager.hole_spawn_counter = static_spawn_counter
-                
-                # Força o spawn a cada 5 tentativas, independente da probabilidade
-                force_spawn = (static_spawn_counter >= 5)
-                if force_spawn:
-                    difficulty_manager.hole_spawn_counter = 0
-                
-                if force_spawn or random.random() < current_hole_probability:
+                # Agora usamos apenas a probabilidade para determinar o spawn
+                if random.random() < current_hole_probability:
                     # Pode aparecer em qualquer faixa
                     all_lanes = range(0, LANE_COUNT_PER_DIRECTION * 2)
                     # Relaxamos a restrição de segurança para permitir mais buracos
@@ -747,7 +739,28 @@ def main():
                     if not safe_lanes:
                         safe_lanes = all_lanes
                         
-                    chosen_lane = random.choice(safe_lanes)
+                    # Tenta encontrar uma lane onde o buraco não colida com manchas de óleo existentes
+                    collision_free_lanes = []
+                    for lane in safe_lanes:
+                        # Cria um buraco temporário para verificar colisões
+                        temp_hole = Hole(hole_texture, lane_index=lane, speed_multiplier=enemy_speed_multiplier)
+                        
+                        # Verifica se o buraco colide com alguma mancha de óleo
+                        collision = False
+                        for oil in oil_stains:
+                            if oil.active and temp_hole.check_collision_with_object(oil):
+                                collision = True
+                                break
+                                
+                        if not collision:
+                            collision_free_lanes.append(lane)
+                    
+                    # Se encontrou lanes sem colisão, usa-as, senão usa as lanes seguras originais
+                    if collision_free_lanes:
+                        chosen_lane = random.choice(collision_free_lanes)
+                    else:
+                        chosen_lane = random.choice(safe_lanes)
+                        
                     holes.append(Hole(hole_texture, lane_index=chosen_lane, speed_multiplier=enemy_speed_multiplier))
             
             # --- Hole Update & Collision ---
@@ -775,21 +788,13 @@ def main():
             else:
                 oil_stain_spawn_timer += 0.3  # Incrementa o timer para spawn
                 
-            oil_stain_spawn_rate = current_spawn_rate * 0.6  # Taxa de spawn um pouco mais lenta que os buracos
+            oil_stain_spawn_rate = current_spawn_rate
             current_oil_stain_probability = difficulty_manager.get_current_oil_stain_spawn_probability()
             
             if oil_stain_spawn_timer >= oil_stain_spawn_rate:
                 oil_stain_spawn_timer = 0
-                # Verificação de probabilidade (com probabilidade garantida a cada X tentativas)
-                static_spawn_counter = getattr(difficulty_manager, 'oil_stain_spawn_counter', 0) + 1
-                difficulty_manager.oil_stain_spawn_counter = static_spawn_counter
-                
-                # Força o spawn a cada 7 tentativas, independente da probabilidade
-                force_spawn = (static_spawn_counter >= 7)
-                if force_spawn:
-                    difficulty_manager.oil_stain_spawn_counter = 0
-                
-                if force_spawn or random.random() < current_oil_stain_probability:
+                # Agora usamos apenas a probabilidade para determinar o spawn
+                if random.random() < current_oil_stain_probability:
                     # Pode aparecer em qualquer faixa
                     all_lanes = range(0, LANE_COUNT_PER_DIRECTION * 2)
                     # Relaxamos a restrição de segurança para permitir mais manchas
@@ -800,7 +805,28 @@ def main():
                     if not safe_lanes:
                         safe_lanes = all_lanes
                         
-                    chosen_lane = random.choice(safe_lanes)
+                    # Tenta encontrar uma lane onde a mancha não colida com buracos existentes
+                    collision_free_lanes = []
+                    for lane in safe_lanes:
+                        # Cria uma mancha temporária para verificar colisões
+                        temp_oil = OilStain(oil_texture, lane_index=lane, speed_multiplier=enemy_speed_multiplier)
+                        
+                        # Verifica se a mancha colide com algum buraco
+                        collision = False
+                        for hole in holes:
+                            if hole.active and temp_oil.check_collision_with_object(hole):
+                                collision = True
+                                break
+                                
+                        if not collision:
+                            collision_free_lanes.append(lane)
+                    
+                    # Se encontrou lanes sem colisão, usa-as, senão usa as lanes seguras originais
+                    if collision_free_lanes:
+                        chosen_lane = random.choice(collision_free_lanes)
+                    else:
+                        chosen_lane = random.choice(safe_lanes)
+                        
                     oil_stains.append(OilStain(oil_texture, lane_index=chosen_lane, speed_multiplier=enemy_speed_multiplier))
             
             # --- Oil Stain Update & Collision ---

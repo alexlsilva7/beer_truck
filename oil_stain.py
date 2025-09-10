@@ -2,6 +2,7 @@
 from OpenGL.GL import *
 import random
 from road import ROAD_WIDTH, GAME_WIDTH, SCREEN_HEIGHT, LANE_WIDTH, LANE_COUNT_PER_DIRECTION, PLAYER_SPEED
+from collision_utils import check_rect_collision
 
 
 class OilStain:
@@ -65,3 +66,21 @@ class OilStain:
         
         glDisable(GL_BLEND)
         glDisable(GL_TEXTURE_2D)
+        
+    def check_collision_with_object(self, obj):
+        """
+        Verifica se esta mancha de óleo colide com outro objeto (como um buraco).
+        
+        Args:
+            obj: Objeto a verificar colisão (deve ter propriedades x, y, width, height)
+            
+        Returns:
+            True se colidir, False caso contrário
+        """
+        if not self.active or not obj.active:
+            return False
+            
+        return check_rect_collision(
+            self.x, self.y, self.width, self.height,
+            obj.x, obj.y, obj.width, obj.height
+        )
