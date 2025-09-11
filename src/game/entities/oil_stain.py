@@ -1,20 +1,19 @@
-# Ficheiro: invulnerability.py
+# Ficheiro: oil_stain.py
 from OpenGL.GL import *
 import random
-import math
-import time
-from road import ROAD_WIDTH, GAME_WIDTH, SCREEN_HEIGHT, LANE_WIDTH, LANE_COUNT_PER_DIRECTION, PLAYER_SPEED
+from src.game.entities.road import ROAD_WIDTH, GAME_WIDTH, SCREEN_HEIGHT, LANE_WIDTH, LANE_COUNT_PER_DIRECTION, PLAYER_SPEED
+from src.utils.collision_utils import check_rect_collision
 
 
-class InvulnerabilityPowerUp:
+class OilStain:
     def __init__(self, texture_id, lane_index=None, speed_multiplier=1.0):
-        """Inicializa as propriedades do power-up de invulnerabilidade na pista."""
+        """Inicializa as propriedades da mancha de óleo na pista."""
         self.texture_id = texture_id
-        # Tamanho do power-up, similar aos outros elementos
-        self.width = LANE_WIDTH * 0.6  # 60% da largura da faixa
-        self.height = 50
+        # Tamanho da mancha de óleo, um pouco menor que o buraco
+        self.width = LANE_WIDTH * 0.7  # 70% da largura da faixa
+        self.height = 60
         self.speed_multiplier = speed_multiplier
-        self.active = True  # Indica se o power-up ainda está ativo (não foi coletado)
+        self.active = True  # Indica se a mancha ainda está ativa (não foi "consumida")
 
         road_x_start_total = (GAME_WIDTH - ROAD_WIDTH) / 2
         if lane_index is None:
@@ -23,28 +22,28 @@ class InvulnerabilityPowerUp:
         else:
             self.lane_index = lane_index
 
-        # Velocidade do power-up deve ser EXATAMENTE igual à velocidade do scrolling da pista
-        # para parecer fixo no chão
+        # Velocidade da mancha deve ser EXATAMENTE igual à velocidade do scrolling da pista
+        # para parecer fixa no chão
         self.speed_y = PLAYER_SPEED * speed_multiplier  # Será ajustada para a velocidade atual do scrolling
 
         lane_x_start = road_x_start_total + self.lane_index * LANE_WIDTH
-        # Centraliza melhor o power-up na faixa
+        # Centraliza melhor a mancha na faixa
         self.x = lane_x_start + (LANE_WIDTH - self.width) / 2
         self.y = SCREEN_HEIGHT
 
     def update(self, scroll_speed=None):
-        """Move o power-up para baixo usando a velocidade atual do scrolling."""
+        """Move a mancha de óleo para baixo usando a velocidade atual do scrolling."""
         if self.active:
             if scroll_speed is not None:
                 # Usa a velocidade de rolagem passada como parâmetro
-                # Nota: scroll_speed é negativo (para baixo), então somamos para que o power-up desça
+                # Nota: scroll_speed é negativo (para baixo), então somamos para que a mancha desça
                 self.y += scroll_speed
             else:
                 # Usa a velocidade original se nenhuma velocidade de rolagem for fornecida
                 self.y -= self.speed_y
 
     def draw(self):
-        """Desenha o power-up na tela usando sua textura."""
+        """Desenha a mancha de óleo na tela usando sua textura."""
         if not self.active:
             return
             
@@ -52,10 +51,10 @@ class InvulnerabilityPowerUp:
         glEnable(GL_BLEND)
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
         
-        # Desenha a textura do power-up normalmente (sem efeito pulsante)
+        # Desenha a textura da mancha normalmente
         glBindTexture(GL_TEXTURE_2D, self.texture_id)
         
-        # Cor normal sem efeito pulsante
+        # Cor normal
         glColor4f(1.0, 1.0, 1.0, 1.0)
 
         glBegin(GL_QUADS)
@@ -65,7 +64,23 @@ class InvulnerabilityPowerUp:
         glTexCoord2f(0, 0); glVertex2f(self.x, self.y + self.height)
         glEnd()
         
-        # Reseta a cor
-        glColor4f(1.0, 1.0, 1.0, 1.0)
         glDisable(GL_BLEND)
         glDisable(GL_TEXTURE_2D)
+        
+    def check_collision_with_object(self, obj):
+        """
+        Verifica se esta mancha de óleo colide com outro objeto (como um buraco).
+        
+        Args:
+            obj: Objeto a verificar colisão (deve ter propriedades x, y, width, height)
+            
+        Returns:
+            True se colidir, False caso contrário
+        """
+        if not self.active or not obj.active:
+            return False
+            
+        return check_rect_collision(
+            self.x, self.y, self.width, self.height,
+            obj.x, obj.y, obj.width, obj.height
+        )

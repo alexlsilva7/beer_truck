@@ -1,9 +1,9 @@
 # Ficheiro: police.py
 from OpenGL.GL import *
-from road import SCREEN_HEIGHT, ROAD_WIDTH, GAME_WIDTH, PLAYER_SPEED
+from src.game.entities.road import SCREEN_HEIGHT, ROAD_WIDTH, GAME_WIDTH, PLAYER_SPEED
 import random
 import threading
-import audio_manager
+import src.game.managers.audio_manager as audio_manager
 
 def preload_police_sound(path, create_loop=True):
     return audio_manager.preload_sound(path, create_loop=create_loop)

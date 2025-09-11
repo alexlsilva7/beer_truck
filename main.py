@@ -9,23 +9,23 @@ import random
 import time
 import pygame
 
-from road import draw_road, SCREEN_WIDTH, SCREEN_HEIGHT, GAME_WIDTH, PANEL_WIDTH, COLOR_PANEL, draw_rect, PLAYER_SPEED, \
+from src.game.entities.road import draw_road, SCREEN_WIDTH, SCREEN_HEIGHT, GAME_WIDTH, PANEL_WIDTH, COLOR_PANEL, draw_rect, PLAYER_SPEED, \
     ROAD_WIDTH, LANE_COUNT_PER_DIRECTION, LANE_WIDTH
-import road
-from truck import Truck
-from enemy import Enemy, EnemyDown
-import police
-from hole import Hole
-from oil_stain import OilStain
-from beer_collectible import BeerCollectible
-from collision_utils import check_rect_collision
-from invulnerability import InvulnerabilityPowerUp
-from score_indicator import ScoreIndicator
-from texture_loader import load_texture
-from menu import MenuState, draw_start_menu, draw_instructions_screen, draw_game_over_menu, draw_name_input_screen, draw_lives, draw_pause_menu
-from difficulty_manager import DifficultyManager
-from high_score_manager import HighScoreManager
-import audio_manager
+import src.game.entities.road as road
+from src.game.entities.truck import Truck
+from src.game.entities.enemy import Enemy, EnemyDown
+import src.game.entities.police as police
+from src.game.entities.hole import Hole
+from src.game.entities.oil_stain import OilStain
+from src.game.entities.beer_collectible import BeerCollectible
+from src.utils.collision_utils import check_rect_collision
+from src.utils.invulnerability import InvulnerabilityPowerUp
+from src.ui.score_indicator import ScoreIndicator
+from src.utils.texture_loader import load_texture
+from src.ui.menu import MenuState, draw_start_menu, draw_instructions_screen, draw_game_over_menu, draw_name_input_screen, draw_lives, draw_pause_menu
+from src.game.managers.difficulty_manager import DifficultyManager
+from src.game.managers.high_score_manager import HighScoreManager
+import src.game.managers.audio_manager as audio_manager
 
 # --- Estados do Jogo ---
 GAME_STATE_MENU = 0
@@ -83,7 +83,7 @@ scroll_speed = -PLAYER_SPEED
 safety_distance = 180
 CRASH_SCROLL_MULTIPLIER = 2.0  # Multiplicador de velocidade durante respawn (2x mais rápido)
 difficulty_manager = DifficultyManager()
-high_score_manager = HighScoreManager()
+high_score_manager = HighScoreManager("data/highscores.json")  # Especifica o caminho para a pasta data
 current_game_state = GAME_STATE_MENU
 menu_state = MenuState()
 police_car = None  # Variável para controlar o carro da polícia
