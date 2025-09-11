@@ -23,6 +23,9 @@ from src.game.entities.road import draw_road, SCREEN_WIDTH, SCREEN_HEIGHT, GAME_
 from src.game.entities.truck import Truck
 from src.game.managers.difficulty_manager import DifficultyManager
 from src.game.managers.high_score_manager import HighScoreManager
+from src.game.managers.lane_manager import get_safe_lanes_for_obstacles, get_safe_lane_for_powerup
+from src.game.managers.viewport_manager import setup_menu_viewport_and_convert_mouse, setup_panel_viewport
+from src.graphics.renderer import draw_game_elements, draw_panel_stats, draw_text
 from src.ui.menu import MenuState, draw_start_menu, draw_instructions_screen, draw_game_over_menu, \
     draw_name_input_screen, draw_pause_menu
 from src.ui.score_indicator import ScoreIndicator
@@ -307,45 +310,40 @@ def reset_game():
     glfw.set_time(0) # Reseta o tempo
 
 
-def draw_text(text, x, y):
-    glDisable(GL_TEXTURE_2D)
-    glColor3f(1.0, 1.0, 1.0)
-    glRasterPos2f(x, y)
-    for character in text:
-        glutBitmapCharacter(GLUT_BITMAP_HELVETICA_18, ord(character))
+
 
 def draw_heart(x, y, size=8, color=(1.0, 0.3, 0.3), filled=True):
     """Desenha um coração usando primitivas geométricas do OpenGL"""
     glDisable(GL_TEXTURE_2D)
     glColor3f(color[0], color[1], color[2])
-    
+
     import math
-    
+
     if filled:
         # Coração preenchido usando uma abordagem mais precisa
         glBegin(GL_TRIANGLE_FAN)
         glVertex2f(x, y)  # Centro
-        
+
         # Criar pontos do coração usando a equação paramétrica
         for i in range(37):  # 36 pontos + volta ao início
             t = i * 2 * math.pi / 36
             # Equação paramétrica do coração
             heart_x, heart_y = calculate_heart_point(t, x, y, size)
             glVertex2f(heart_x, heart_y)
-        
+
         glEnd()
     else:
         # Coração vazado (apenas contorno)
         glLineWidth(2.0)
         glBegin(GL_LINE_LOOP)
-        
+
         # Criar pontos do contorno do coração
         for i in range(36):
             t = i * 2 * math.pi / 36
             # Equação paramétrica do coração
             heart_x, heart_y = calculate_heart_point(t, x, y, size)
             glVertex2f(heart_x, heart_y)
-        
+
         glEnd()
         glLineWidth(1.0)
 
@@ -356,7 +354,7 @@ def calculate_heart_point(t, x, y, size):
     return heart_x, heart_y
 
 def main():
-    global current_game_state, scroll_pos, player_truck, enemies_up, enemies_down, spawn_timer_up, spawn_timer_down, police_car, holes, hole_spawn_timer, oil_stains, oil_stain_spawn_timer, beer_collectibles, beer_spawn_timer, invulnerability_powerups, invulnerability_spawn_timer, score_indicators, pending_score_bonus, beer_bonus_points, sys, random, last_police_spawn_time, current_scale, current_offset, fb_height
+    global current_game_state, scroll_pos, player_truck, enemies_up, enemies_down, spawn_timer_up, spawn_timer_down, police_car, holes, hole_spawn_timer, oil_stains, oil_stain_spawn_timer, beer_collectibles, beer_spawn_timer, invulnerability_powerups, invulnerability_spawn_timer, score_indicators, pending_score_bonus, beer_bonus_points, sys, random, last_police_spawn_time, current_scale, current_offset, fb_height, asking_for_name, new_high_score
 
     if not glfw.init():
         sys.exit("Could not initialize GLFW.")
@@ -1051,16 +1049,8 @@ def main():
             else:
                 displayed_speed = base_speed
 
-            score = abs(scroll_pos * 0.1) + beer_bonus_points
+            score, lives_x = draw_panel_stats(scroll_pos, beer_bonus_points, time_elapsed, displayed_speed, SCREEN_HEIGHT)
 
-            # Top stats
-            draw_text(f"Time: {int(time_elapsed)}", 12, SCREEN_HEIGHT - 28)
-            draw_text(f"Speed: {displayed_speed:.0f} km/h", 12, SCREEN_HEIGHT - 52)
-            draw_text(f"Score: {int(score)}", 12, SCREEN_HEIGHT - 76)
-
-            # Exibe as vidas usando corações desenhados geometricamente
-            draw_text("Lives:", 12, SCREEN_HEIGHT - 100)
-            lives_x = 80
             for i in range(player_truck.lives):
                 if player_truck.invulnerable:
                     # Pisca durante invulnerabilidade
@@ -1174,13 +1164,7 @@ def main():
                                                             SCREEN_HEIGHT, COLOR_PANEL, scroll_speed)
 
             displayed_speed = base_speed * player_truck.current_speed_factor if player_truck.slowed_down else base_speed
-            score = abs(scroll_pos * 0.1) + beer_bonus_points
-
-            draw_text(f"Time: {int(time_elapsed)}", 12, SCREEN_HEIGHT - 28)
-            draw_text(f"Speed: {displayed_speed:.0f} km/h", 12, SCREEN_HEIGHT - 52)
-            draw_text(f"Score: {int(score)}", 12, SCREEN_HEIGHT - 76)
-            draw_text("Lives:", 12, SCREEN_HEIGHT - 100)
-            lives_x = 80
+            score, lives_x = draw_panel_stats(scroll_pos, beer_bonus_points, time_elapsed, displayed_speed, SCREEN_HEIGHT)
             for i in range(player_truck.lives):
                 draw_heart(lives_x + i * 25, SCREEN_HEIGHT - 95, size=10, color=(1.0, 0.3, 0.3), filled=True)
             for i in range(player_truck.lives, 3):
@@ -1199,137 +1183,7 @@ def main():
     glfw.terminate()
 
 
-def setup_menu_viewport_and_convert_mouse(content_vp, base_total_width, base_height, fb_height, offset_x, offset_y,
-                                          scale, window):
-    """
-    Configura a viewport do menu e converte as coordenadas do mouse para o sistema de coordenadas lógico.
 
-    Args:
-        content_vp: Viewport de conteúdo (x, y, largura, altura)
-        base_total_width: Largura total base
-        base_height: Altura base
-        fb_height: Altura do framebuffer
-        offset_x: Deslocamento X
-        offset_y: Deslocamento Y
-        scale: Escala de renderização
-        window: Janela GLFW
-
-    Returns:
-        Tuple com as coordenadas lógicas do mouse (mouse_x, mouse_y)
-    """
-    # Configura a viewport para cobrir toda a área de conteúdo
-    glViewport(content_vp[0], content_vp[1], content_vp[2], content_vp[3])
-    glMatrixMode(GL_PROJECTION)
-    glLoadIdentity()
-    gluOrtho2D(0, base_total_width, 0, base_height)
-    glMatrixMode(GL_MODELVIEW)
-    glLoadIdentity()
-
-    # Converte as coordenadas do mouse para o sistema lógico do menu
-    mouse_px, mouse_py = glfw.get_cursor_pos(window)
-    inv_mouse_py = fb_height - mouse_py
-    safe_scale = scale if scale and scale > 0.0 else 1e-6
-    mouse_x = (mouse_px - offset_x) / safe_scale
-    mouse_y = (inv_mouse_py - offset_y) / safe_scale
-
-    return mouse_x, mouse_y
-
-
-def get_safe_lane_for_powerup(powerups, lane_count, screen_height, safety_dist):
-    """
-    Escolhe uma faixa segura para spawn de um power-up, evitando faixas com power-ups muito próximos.
-
-    Args:
-        powerups: Lista de power-ups já existentes na tela
-        lane_count: Número de faixas por direção
-        screen_height: Altura da tela
-        safety_dist: Distância mínima de segurança entre power-ups
-
-    Returns:
-        int: Índice da faixa escolhida para spawn
-    """
-    all_lanes = range(0, lane_count * 2)
-    # Verifica se há faixas seguras (sem outros power-ups muito próximos)
-    safe_lanes = [lane for lane in all_lanes if
-                  max((p.y for p in powerups if p.lane_index == lane), default=0) < screen_height - safety_dist]
-
-    # Se não houver faixas seguras, usa todas as faixas
-    if not safe_lanes:
-        safe_lanes = all_lanes
-
-    return random.choice(safe_lanes)
-
-def get_safe_lanes_for_obstacles(oil_stains, lane_count_per_direction, screen_height, safety_distance):
-    all_lanes = range(0, lane_count_per_direction * 2)
-    # Relaxamos a restrição de segurança para permitir mais manchas
-    safe_lanes = [lane for lane in all_lanes if
-                  max((o.y for o in oil_stains if o.lane_index == lane),
-                      default=0) < screen_height - safety_distance / 2]
-
-    # Se não houver faixas seguras, usa todas as faixas
-    if not safe_lanes:
-        safe_lanes = all_lanes
-
-    return safe_lanes, all_lanes
-
-def setup_panel_viewport(panel_vp, base_panel_width, base_height, panel_width, screen_height, color_panel, scroll_speed):
-    """Configura a viewport do painel lateral e desenha o fundo"""
-    glViewport(panel_vp[0], panel_vp[1], panel_vp[2], panel_vp[3])
-    glMatrixMode(GL_PROJECTION)
-    glLoadIdentity()
-    gluOrtho2D(0, base_panel_width, 0, base_height)
-    glMatrixMode(GL_MODELVIEW)
-    glLoadIdentity()
-
-    # Painel lateral - fundo
-    draw_rect(0, 0, panel_width, screen_height, color_panel)
-    time_elapsed = glfw.get_time()
-
-    # Calcula a velocidade considerando o efeito do buraco com transição suave
-    base_speed = abs(scroll_speed * 400)
-    return time_elapsed, base_speed
-
-def draw_game_elements(game_vp, base_game_width, base_height, scroll_pos, holes, oil_stains, beer_collectibles,
-                       score_indicators, invulnerability_powerups, player_truck, enemies_up, enemies_down, police_car):
-    # Configuração da viewport e projeção
-    glViewport(game_vp[0], game_vp[1], game_vp[2], game_vp[3])
-    glMatrixMode(GL_PROJECTION)
-    glLoadIdentity()
-    gluOrtho2D(0, base_game_width, 0, base_height)
-    glMatrixMode(GL_MODELVIEW)
-    glLoadIdentity()
-
-    draw_road(scroll_pos)
-
-    # Desenha os buracos e manchas primeiro (para ficarem "abaixo" dos carros)
-    for hole in holes:
-        hole.draw()
-
-    # Desenha as manchas de óleo
-    for oil_stain in oil_stains:
-        oil_stain.draw()
-
-    # Desenha as cervejas colecionáveis
-    for beer in beer_collectibles:
-        beer.draw()
-
-    # Desenha os indicadores de pontos
-    for indicator in score_indicators:
-        indicator.draw()
-
-    # Desenha os power-ups de invulnerabilidade
-    for powerup in invulnerability_powerups:
-        powerup.draw()
-
-    player_truck.draw()
-    for enemy in enemies_up:
-        enemy.draw()
-    for enemy in enemies_down:
-        enemy.draw()
-
-    # Desenha o carro da polícia se ele existir
-    if police_car:
-        police_car.draw()
 
 if __name__ == "__main__":
     main()
