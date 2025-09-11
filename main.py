@@ -511,7 +511,7 @@ def main():
                 player_truck.update()
                 
                 dx, dy = 0.0, 0.0
-                DEADZONE = 0.3  # Zona morta para o analógico
+                deadzone = 0.3  # Zona morta para o analógico
 
                 # --- Controle do Joystick ---
                 if joystick:
@@ -519,12 +519,12 @@ def main():
 
                     # Eixo X (esquerda/direita) do analógico esquerdo
                     axis_x = joystick.get_axis(0)
-                    if abs(axis_x) > DEADZONE:
+                    if abs(axis_x) > deadzone:
                         dx = axis_x * 0.1
 
                     # Eixo Y (cima/baixo) do analógico esquerdo
                     axis_y = joystick.get_axis(1)
-                    if abs(axis_y) > DEADZONE:
+                    if abs(axis_y) > deadzone:
                         # Pygame considera -1 para cima, então invertemos
                         if axis_y < 0:  # Para cima
                             dy = 0.1
