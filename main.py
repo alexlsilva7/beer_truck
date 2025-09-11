@@ -1,4 +1,6 @@
+import math
 import time
+import random
 
 import glfw
 import pygame
