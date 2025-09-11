@@ -186,6 +186,21 @@ class Truck:
                 truck_hitbox_y < other_hitbox_y + other_hitbox_height and
                 truck_hitbox_y + truck_hitbox_height > other_hitbox_y)
 
+    def get_collision_rect(self):
+        """Retorna um retângulo para detecção de colisão."""
+        # Usa as mesmas dimensões da hitbox efetiva
+        truck_hitbox_width = self.width / 1.3
+        truck_hitbox_height = self.height / 1.1
+        truck_hitbox_x = self.x + (self.width - truck_hitbox_width) / 2
+        truck_hitbox_y = self.y + (self.height - truck_hitbox_height) / 2
+        
+        return {
+            'x': truck_hitbox_x,
+            'y': truck_hitbox_y,
+            'width': truck_hitbox_width,
+            'height': truck_hitbox_height
+        }
+
     def draw_debug_hitbox(self, show_collision_area=True):
         """Desenha a hitbox de debug para visualização."""
         # Desenha o retângulo completo do sprite (vermelho)
@@ -268,6 +283,31 @@ class Truck:
         # Para o power-up, usa uma hitbox generosa
         powerup_hitbox_width = powerup.width / 1.1  # ← AJUSTÁVEL
         powerup_hitbox_height = powerup.height / 1.1  # ← AJUSTÁVEL
+        
+        powerup_hitbox_x = powerup.x + (powerup.width - powerup_hitbox_width) / 2
+        powerup_hitbox_y = powerup.y + (powerup.height - powerup_hitbox_height) / 2
+        
+        # Verifica sobreposição dos retângulos das hitboxes
+        return (truck_hitbox_x < powerup_hitbox_x + powerup_hitbox_width and
+                truck_hitbox_x + truck_hitbox_width > powerup_hitbox_x and
+                truck_hitbox_y < powerup_hitbox_y + powerup_hitbox_height and
+                truck_hitbox_y + truck_hitbox_height > powerup_hitbox_y)
+
+    def check_slowmotion_powerup_collision(self, powerup):
+        """Verifica a colisão com um power-up de slow motion."""
+        if not powerup.active or self.crashed:
+            return False
+        
+        # Calcula as hitboxes efetivas do caminhão (igual aos outros métodos)
+        truck_hitbox_width = self.width / 1.3  # ← MESMO SISTEMA DE HITBOXES
+        truck_hitbox_height = self.height / 1.1  # ← MESMO SISTEMA DE HITBOXES
+        
+        truck_hitbox_x = self.x + (self.width - truck_hitbox_width) / 2
+        truck_hitbox_y = self.y + (self.height - truck_hitbox_height) / 2
+        
+        # Para o power-up de slow motion, usa uma hitbox mais generosa para facilitar a coleta
+        powerup_hitbox_width = powerup.width / 1.6  # ← AJUSTÁVEL (mais generoso que invulnerabilidade)
+        powerup_hitbox_height = powerup.height / 1.6  # ← AJUSTÁVEL (mais generoso que invulnerabilidade)
         
         powerup_hitbox_x = powerup.x + (powerup.width - powerup_hitbox_width) / 2
         powerup_hitbox_y = powerup.y + (powerup.height - powerup_hitbox_height) / 2
