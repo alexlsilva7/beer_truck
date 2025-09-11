@@ -1,7 +1,9 @@
-from OpenGL.GL import *
-from src.game.entities.road import ROAD_WIDTH, GAME_WIDTH, SCREEN_HEIGHT
-from src.utils.debug_utils import draw_hitbox, draw_collision_area, draw_real_hitbox
 import time
+
+from OpenGL.GL import *
+
+from src.game.entities.road import ROAD_WIDTH, GAME_WIDTH, SCREEN_HEIGHT
+from src.utils.debug_utils import draw_hitbox, draw_real_hitbox
 
 
 class Truck:
@@ -207,13 +209,9 @@ class Truck:
         """Verifica a colisão com um buraco."""
         if not hole.active or self.crashed:
             return False
-        
-        # Calcula as hitboxes efetivas do caminhão (igual aos outros métodos)
-        truck_hitbox_width = self.width / 1.3  # ← MESMO SISTEMA DE HITBOXES
-        truck_hitbox_height = self.height / 1.1  # ← MESMO SISTEMA DE HITBOXES
-        
-        truck_hitbox_x = self.x + (self.width - truck_hitbox_width) / 2
-        truck_hitbox_y = self.y + (self.height - truck_hitbox_height) / 2
+
+        # Usa a função auxiliar para calcular a hitbox do caminhão
+        truck_hitbox_x, truck_hitbox_y, truck_hitbox_width, truck_hitbox_height = self.calculate_truck_hitbox()
         
         # Para o buraco, usa uma hitbox igual à visualização
         hole_hitbox_width = hole.width / 1.6  # ← AJUSTÁVEL
@@ -232,13 +230,9 @@ class Truck:
         """Verifica a colisão com uma mancha de óleo."""
         if not oil_stain.active or self.crashed:
             return False
-        
-        # Calcula as hitboxes efetivas do caminhão (igual aos outros métodos)
-        truck_hitbox_width = self.width / 1.3  # ← MESMO SISTEMA DE HITBOXES
-        truck_hitbox_height = self.height / 1.1  # ← MESMO SISTEMA DE HITBOXES
-        
-        truck_hitbox_x = self.x + (self.width - truck_hitbox_width) / 2
-        truck_hitbox_y = self.y + (self.height - truck_hitbox_height) / 2
+
+        # Usa a função auxiliar para calcular a hitbox do caminhão
+        truck_hitbox_x, truck_hitbox_y, truck_hitbox_width, truck_hitbox_height = self.calculate_truck_hitbox()
         
         # Para o óleo, usa uma hitbox ligeiramente maior que a visualização
         oil_hitbox_width = oil_stain.width / 1.2  # ← AJUSTÁVEL
@@ -257,13 +251,9 @@ class Truck:
         """Verifica a colisão com um power-up de invulnerabilidade."""
         if not powerup.active or self.crashed:
             return False
-        
-        # Calcula as hitboxes efetivas do caminhão (igual aos outros métodos)
-        truck_hitbox_width = self.width / 1.3  # ← MESMO SISTEMA DE HITBOXES
-        truck_hitbox_height = self.height / 1.1  # ← MESMO SISTEMA DE HITBOXES
-        
-        truck_hitbox_x = self.x + (self.width - truck_hitbox_width) / 2
-        truck_hitbox_y = self.y + (self.height - truck_hitbox_height) / 2
+
+        # Usa a função auxiliar para calcular a hitbox do caminhão
+        truck_hitbox_x, truck_hitbox_y, truck_hitbox_width, truck_hitbox_height = self.calculate_truck_hitbox()
         
         # Para o power-up, usa uma hitbox generosa
         powerup_hitbox_width = powerup.width / 1.1  # ← AJUSTÁVEL
@@ -361,3 +351,14 @@ class Truck:
         self.current_speed_factor = 1.0
         self.controls_inverted = False
         self.controls_inverted_start_time = 0
+
+    def calculate_truck_hitbox(self):
+        """Calcula e retorna a hitbox efetiva do caminhão."""
+        truck_hitbox_width = self.width / 1.3  # Hitbox mais estreita que o sprite
+        truck_hitbox_height = self.height / 1.1  # Hitbox mais baixa que o sprite
+
+        # Centraliza a hitbox no sprite
+        truck_hitbox_x = self.x + (self.width - truck_hitbox_width) / 2
+        truck_hitbox_y = self.y + (self.height - truck_hitbox_height) / 2
+
+        return truck_hitbox_x, truck_hitbox_y, truck_hitbox_width, truck_hitbox_height
