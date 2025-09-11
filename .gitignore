@@ -186,4 +186,4 @@ $RECYCLE.BIN/
 *.save
 config.ini
 settings.json
-/highscores.json
+data/highscores.json

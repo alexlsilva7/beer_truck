@@ -1,5 +1,5 @@
 from OpenGL.GL import *
-from road import ROAD_WIDTH, GAME_WIDTH, SCREEN_HEIGHT
+from src.game.entities.road import ROAD_WIDTH, GAME_WIDTH, SCREEN_HEIGHT
 import time
 
 

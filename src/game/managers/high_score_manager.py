@@ -2,8 +2,20 @@ import json
 import os
 
 class HighScoreManager:
-    def __init__(self, file_path="highscores.json"):
-        self.file_path = file_path
+    def __init__(self, file_path="data/highscores.json"):
+        # Se o caminho não for absoluto, torna-o relativo ao diretório do projeto
+        if not os.path.isabs(file_path):
+            # Encontra o diretório raiz do projeto (onde está o main.py)
+            current_dir = os.path.dirname(os.path.abspath(__file__))
+            project_root = os.path.join(current_dir, "..", "..", "..")
+            project_root = os.path.normpath(project_root)
+            self.file_path = os.path.join(project_root, file_path)
+        else:
+            self.file_path = file_path
+        
+        # Garante que o diretório existe
+        os.makedirs(os.path.dirname(self.file_path), exist_ok=True)
+        
         self.high_scores = []
         self.load_high_scores()
 
@@ -57,3 +69,32 @@ class HighScoreManager:
         # Se tiver 3 recordes, verifica se a pontuação é maior que o menor deles
         lowest_score = self.high_scores[-1]["score"] if self.high_scores else 0
         return score > lowest_score
+    
+    def change_file_path(self, new_file_path):
+        """Permite alterar o caminho do arquivo de high scores."""
+        # Salva os dados atuais no local antigo antes de mudar
+        self.save_high_scores()
+        
+        # Atualiza o caminho
+        if not os.path.isabs(new_file_path):
+            current_dir = os.path.dirname(os.path.abspath(__file__))
+            project_root = os.path.join(current_dir, "..", "..", "..")
+            project_root = os.path.normpath(project_root)
+            self.file_path = os.path.join(project_root, new_file_path)
+        else:
+            self.file_path = new_file_path
+        
+        # Garante que o diretório existe
+        os.makedirs(os.path.dirname(self.file_path), exist_ok=True)
+        
+        # Carrega os dados do novo local (ou cria arquivo vazio se não existir)
+        self.load_high_scores()
+    
+    def get_current_file_path(self):
+        """Retorna o caminho atual do arquivo de high scores."""
+        return self.file_path
+    
+    def reset_high_scores(self):
+        """Reseta todos os high scores (limpa a lista)."""
+        self.high_scores = []
+        self.save_high_scores()

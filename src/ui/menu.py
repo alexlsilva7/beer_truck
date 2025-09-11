@@ -3,8 +3,8 @@ from OpenGL.GL import *
 from OpenGL.GLU import *
 from OpenGL.GLUT import *
 from OpenGL.GLUT import GLUT_BITMAP_HELVETICA_18, GLUT_BITMAP_TIMES_ROMAN_24, GLUT_BITMAP_HELVETICA_12
-from road import SCREEN_WIDTH, SCREEN_HEIGHT, draw_rect
-import high_score_manager  # Importa o gerenciador de recordes
+from src.game.entities.road import SCREEN_WIDTH, SCREEN_HEIGHT, draw_rect
+import src.game.managers.high_score_manager as high_score_manager  # Importa o gerenciador de recordes
 
 # --- Cores para o Menu ---
 COLOR_MENU_BG_TOP = (0.1, 0.1, 0.2)

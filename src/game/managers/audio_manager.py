@@ -20,8 +20,11 @@ def _resolve_path(path):
             return path
         if os.path.isabs(path):
             return path
-        base = os.path.dirname(os.path.abspath(__file__))
-        return os.path.join(base, path)
+        # Encontra o diretório raiz do projeto (onde está o main.py)
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        project_root = os.path.join(current_dir, "..", "..", "..")
+        project_root = os.path.normpath(project_root)
+        return os.path.join(project_root, path)
     except Exception:
         return path
 
@@ -54,6 +57,15 @@ def preload_sound(path, create_loop=True):
     Aceita caminhos relativos ao diretório deste módulo.
     """
     path = _resolve_path(path)
+    
+    # Verifica se o arquivo existe antes de tentar carregar
+    if not os.path.exists(path):
+        print(f"Warning: Audio file not found: {path}")
+        # Retorna um evento já setado para não bloquear o código
+        ready_ev = threading.Event()
+        ready_ev.set()
+        return ready_ev
+    
     with _audio_cache_lock:
         entry = _audio_cache.get(path)
         if entry:
@@ -167,6 +179,11 @@ class SoundPlayer:
         self._audio_lock = threading.Lock()
         self._audio_channel = None
         self._thread = None
+
+        # Verifica se o arquivo existe
+        if not os.path.exists(path):
+            print(f"Warning: Audio file not found during SoundPlayer init: {path}")
+            return
 
         full, loop, tmp = get_preloaded_sounds(path)
         self._full = full
