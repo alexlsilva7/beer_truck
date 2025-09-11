@@ -460,31 +460,31 @@ def main():
         fb_height = fb_size[1]
 
         # Base logical resolution (use existing imported GAME_WIDTH / PANEL_WIDTH / SCREEN_HEIGHT as reference)
-        BASE_GAME_WIDTH = GAME_WIDTH
-        BASE_PANEL_WIDTH = PANEL_WIDTH
-        BASE_TOTAL_WIDTH = BASE_GAME_WIDTH + BASE_PANEL_WIDTH
-        BASE_HEIGHT = SCREEN_HEIGHT
+        base_game_width = GAME_WIDTH
+        base_panel_width = PANEL_WIDTH
+        base_total_width = base_game_width + base_panel_width
+        base_height = SCREEN_HEIGHT
 
         # Scale uniformly to fit framebuffer while preserving aspect ratio
-        scale = min(fb_width / float(BASE_TOTAL_WIDTH), fb_height / float(BASE_HEIGHT)) if BASE_TOTAL_WIDTH > 0 and BASE_HEIGHT > 0 else 1.0
+        scale = min(fb_width / float(base_total_width), fb_height / float(base_height)) if base_total_width > 0 and base_height > 0 else 1.0
         # Prevent zero or negative scale (can happen when framebuffer width/height is 0 e.g. minimized window)
         if not scale or scale <= 0.0:
             scale = 1e-6
-        scaled_width = BASE_TOTAL_WIDTH * scale
-        scaled_height = BASE_HEIGHT * scale
+        scaled_width = base_total_width * scale
+        scaled_height = base_height * scale
         offset_x = (fb_width - scaled_width) / 2.0
         offset_y = (fb_height - scaled_height) / 2.0
 
         # Integer viewports
         content_vp = (int(round(offset_x)), int(round(offset_y)), int(round(scaled_width)), int(round(scaled_height)))
-        game_vp = (int(round(offset_x)), int(round(offset_y)), int(round(BASE_GAME_WIDTH * scale)), int(round(scaled_height)))
-        panel_vp = (int(round(offset_x + BASE_GAME_WIDTH * scale)), int(round(offset_y)), int(round(BASE_PANEL_WIDTH * scale)), int(round(scaled_height)))
+        game_vp = (int(round(offset_x)), int(round(offset_y)), int(round(base_game_width * scale)), int(round(scaled_height)))
+        panel_vp = (int(round(offset_x + base_game_width * scale)), int(round(offset_y)), int(round(base_panel_width * scale)), int(round(scaled_height)))
 
         # Make road module use logical base coords for layout calculations (keeps helper functions consistent)
-        road.SCREEN_WIDTH = BASE_TOTAL_WIDTH
-        road.SCREEN_HEIGHT = BASE_HEIGHT
-        road.GAME_WIDTH = BASE_GAME_WIDTH
-        road.PANEL_WIDTH = BASE_PANEL_WIDTH
+        road.SCREEN_WIDTH = base_total_width
+        road.SCREEN_HEIGHT = base_height
+        road.GAME_WIDTH = base_game_width
+        road.PANEL_WIDTH = base_panel_width
 
         # Expose values for mouse mapping and other draw code
         current_scale = scale
@@ -1000,7 +1000,7 @@ def main():
             glViewport(content_vp[0], content_vp[1], content_vp[2], content_vp[3])
             glMatrixMode(GL_PROJECTION)
             glLoadIdentity()
-            gluOrtho2D(0, BASE_TOTAL_WIDTH, 0, BASE_HEIGHT)
+            gluOrtho2D(0, base_total_width, 0, base_height)
             glMatrixMode(GL_MODELVIEW)
             glLoadIdentity()
 
@@ -1035,7 +1035,7 @@ def main():
         elif current_game_state == GAME_STATE_PLAYING:
             # --- Game Viewport (scaled) ---
             # Usar a mesma função para desenhar os elementos do jogo na tela de pausa
-            draw_game_elements(game_vp, BASE_GAME_WIDTH, BASE_HEIGHT, scroll_pos, holes, oil_stains, beer_collectibles,
+            draw_game_elements(game_vp, base_game_width, base_height, scroll_pos, holes, oil_stains, beer_collectibles,
                                score_indicators, invulnerability_powerups, player_truck, enemies_up, enemies_down,
                                police_car)
 
@@ -1071,7 +1071,7 @@ def main():
                     powerup.draw_debug_hitbox()
 
             # --- Panel Viewport (scaled) ---
-            time_elapsed, base_speed = setup_panel_viewport(panel_vp, BASE_PANEL_WIDTH, BASE_HEIGHT, PANEL_WIDTH,
+            time_elapsed, base_speed = setup_panel_viewport(panel_vp, base_panel_width, base_height, PANEL_WIDTH,
                                                             SCREEN_HEIGHT, COLOR_PANEL, scroll_speed)
             if player_truck.slowed_down:
                 # Usa o fator de velocidade atual que muda gradualmente
@@ -1193,12 +1193,12 @@ def main():
             # A lógica de desenho é a mesma do estado 'PLAYING', mas sem a lógica de update.
 
             # --- Game Viewport (scaled) ---
-            draw_game_elements(game_vp, BASE_GAME_WIDTH, BASE_HEIGHT, scroll_pos, holes, oil_stains, beer_collectibles,
+            draw_game_elements(game_vp, base_game_width, base_height, scroll_pos, holes, oil_stains, beer_collectibles,
                                score_indicators, invulnerability_powerups, player_truck, enemies_up, enemies_down,
                                police_car)
 
             # --- Panel Viewport (scaled) ---
-            time_elapsed, base_speed = setup_panel_viewport(panel_vp, BASE_PANEL_WIDTH, BASE_HEIGHT, PANEL_WIDTH,
+            time_elapsed, base_speed = setup_panel_viewport(panel_vp, base_panel_width, base_height, PANEL_WIDTH,
                                                             SCREEN_HEIGHT, COLOR_PANEL, scroll_speed)
 
             displayed_speed = base_speed * player_truck.current_speed_factor if player_truck.slowed_down else base_speed
@@ -1220,7 +1220,7 @@ def main():
             glViewport(content_vp[0], content_vp[1], content_vp[2], content_vp[3])
             glMatrixMode(GL_PROJECTION)
             glLoadIdentity()
-            gluOrtho2D(0, BASE_TOTAL_WIDTH, 0, BASE_HEIGHT)
+            gluOrtho2D(0, base_total_width, 0, base_height)
             glMatrixMode(GL_MODELVIEW)
             glLoadIdentity()
 
