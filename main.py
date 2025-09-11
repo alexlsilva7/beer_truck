@@ -859,16 +859,7 @@ def main():
                 
                 if random.random() < current_beer_probability:
                     # Pode aparecer em qualquer faixa
-                    all_lanes = range(0, LANE_COUNT_PER_DIRECTION * 2)
-                    # Verifica faixas seguras para não sobrecarregar
-                    safe_lanes = [lane for lane in all_lanes if 
-                                  max((b.y for b in beer_collectibles if b.lane_index == lane), default=0) < SCREEN_HEIGHT - safety_distance]
-                    
-                    # Se não houver faixas seguras, usa todas as faixas
-                    if not safe_lanes:
-                        safe_lanes = all_lanes
-                        
-                    chosen_lane = random.choice(safe_lanes)
+                    chosen_lane = get_safe_lane_for_powerup(invulnerability_powerups, LANE_COUNT_PER_DIRECTION, SCREEN_HEIGHT, safety_distance)
                     beer_collectibles.append(BeerCollectible(beer_texture, lane_index=chosen_lane, speed_multiplier=enemy_speed_multiplier))
             
             # --- Beer Collectible Update & Collision ---
@@ -937,16 +928,8 @@ def main():
                 
                 if force_spawn or random.random() < current_invulnerability_probability:
                     # Pode aparecer em qualquer faixa
-                    all_lanes = range(0, LANE_COUNT_PER_DIRECTION * 2)
-                    # Verifica se há faixas seguras (sem outros power-ups muito próximos)
-                    safe_lanes = [lane for lane in all_lanes if 
-                                  max((p.y for p in invulnerability_powerups if p.lane_index == lane), default=0) < SCREEN_HEIGHT - safety_distance]
-                    
-                    # Se não houver faixas seguras, usa todas as faixas
-                    if not safe_lanes:
-                        safe_lanes = all_lanes
-                        
-                    chosen_lane = random.choice(safe_lanes)
+                    chosen_lane = get_safe_lane_for_powerup(invulnerability_powerups, LANE_COUNT_PER_DIRECTION,
+                                                            SCREEN_HEIGHT, safety_distance)
                     invulnerability_powerups.append(InvulnerabilityPowerUp(invulnerability_texture, lane_index=chosen_lane, speed_multiplier=enemy_speed_multiplier))
             
             # --- Invulnerability Power-Up Update & Collision ---
@@ -1236,6 +1219,31 @@ def main():
         glfw.swap_buffers(window)
 
     glfw.terminate()
+
+
+def get_safe_lane_for_powerup(powerups, lane_count, screen_height, safety_dist):
+    """
+    Escolhe uma faixa segura para spawn de um power-up, evitando faixas com power-ups muito próximos.
+
+    Args:
+        powerups: Lista de power-ups já existentes na tela
+        lane_count: Número de faixas por direção
+        screen_height: Altura da tela
+        safety_dist: Distância mínima de segurança entre power-ups
+
+    Returns:
+        int: Índice da faixa escolhida para spawn
+    """
+    all_lanes = range(0, lane_count * 2)
+    # Verifica se há faixas seguras (sem outros power-ups muito próximos)
+    safe_lanes = [lane for lane in all_lanes if
+                  max((p.y for p in powerups if p.lane_index == lane), default=0) < screen_height - safety_dist]
+
+    # Se não houver faixas seguras, usa todas as faixas
+    if not safe_lanes:
+        safe_lanes = all_lanes
+
+    return random.choice(safe_lanes)
 
 def get_safe_lanes_for_obstacles(oil_stains, lane_count_per_direction, screen_height, safety_distance):
     all_lanes = range(0, lane_count_per_direction * 2)
