@@ -742,17 +742,8 @@ def main():
                 hole_spawn_timer = 0
                 # Agora usamos apenas a probabilidade para determinar o spawn
                 if random.random() < current_hole_probability:
-                    # Pode aparecer em qualquer faixa
-                    all_lanes = range(0, LANE_COUNT_PER_DIRECTION * 2)
-                    # Relaxamos a restrição de segurança para permitir mais buracos
-                    safe_lanes = [lane for lane in all_lanes if 
-                                  max((h.y for h in holes if h.lane_index == lane), default=0) < SCREEN_HEIGHT - safety_distance/2]
-                    
-                    # Se não houver faixas seguras, usa todas as faixas
-                    if not safe_lanes:
-                        safe_lanes = all_lanes
-                        
-                    # Tenta encontrar uma lane onde o buraco não colida com manchas de óleo existentes
+                    safe_lanes, all_lanes = get_safe_lanes_for_obstacles(oil_stains, LANE_COUNT_PER_DIRECTION,
+                                                                         SCREEN_HEIGHT, safety_distance)
                     collision_free_lanes = []
                     for lane in safe_lanes:
                         # Cria um buraco temporário para verificar colisões
@@ -809,16 +800,8 @@ def main():
                 # Agora usamos apenas a probabilidade para determinar o spawn
                 if random.random() < current_oil_stain_probability:
                     # Pode aparecer em qualquer faixa
-                    all_lanes = range(0, LANE_COUNT_PER_DIRECTION * 2)
-                    # Relaxamos a restrição de segurança para permitir mais manchas
-                    safe_lanes = [lane for lane in all_lanes if 
-                                  max((o.y for o in oil_stains if o.lane_index == lane), default=0) < SCREEN_HEIGHT - safety_distance/2]
-                    
-                    # Se não houver faixas seguras, usa todas as faixas
-                    if not safe_lanes:
-                        safe_lanes = all_lanes
-                        
-                    # Tenta encontrar uma lane onde a mancha não colida com buracos existentes
+                    safe_lanes, all_lanes = get_safe_lanes_for_obstacles(oil_stains, LANE_COUNT_PER_DIRECTION,
+                                                                         SCREEN_HEIGHT, safety_distance)
                     collision_free_lanes = []
                     for lane in safe_lanes:
                         # Cria uma mancha temporária para verificar colisões
@@ -1272,6 +1255,20 @@ def main():
         glfw.swap_buffers(window)
 
     glfw.terminate()
+
+def get_safe_lanes_for_obstacles(oil_stains, lane_count_per_direction, screen_height, safety_distance):
+    all_lanes = range(0, lane_count_per_direction * 2)
+    # Relaxamos a restrição de segurança para permitir mais manchas
+    safe_lanes = [lane for lane in all_lanes if
+                  max((o.y for o in oil_stains if o.lane_index == lane),
+                      default=0) < screen_height - safety_distance / 2]
+
+    # Se não houver faixas seguras, usa todas as faixas
+    if not safe_lanes:
+        safe_lanes = all_lanes
+
+    return safe_lanes, all_lanes
+
 
 def draw_game_elements(game_vp, base_game_width, base_height, scroll_pos, holes, oil_stains, beer_collectibles,
                        score_indicators, invulnerability_powerups, player_truck, enemies_up, enemies_down, police_car):
