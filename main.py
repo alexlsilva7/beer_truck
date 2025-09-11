@@ -980,20 +980,9 @@ def main():
 
         if current_game_state == GAME_STATE_MENU or current_game_state == GAME_STATE_GAME_OVER:
             # --- Scaled viewport for Menu / Game Over (preserve aspect ratio) ---
-            glViewport(content_vp[0], content_vp[1], content_vp[2], content_vp[3])
-            glMatrixMode(GL_PROJECTION)
-            glLoadIdentity()
-            gluOrtho2D(0, base_total_width, 0, base_height)
-            glMatrixMode(GL_MODELVIEW)
-            glLoadIdentity()
 
-            # Convert mouse pixel coords -> logical base coordinates
-            mouse_px, mouse_py = glfw.get_cursor_pos(window)
-            inv_mouse_py = fb_height - mouse_py
-            # Use a safe_scale to avoid division by zero when framebuffer dimensions are zero
-            safe_scale = scale if scale and scale > 0.0 else 1e-6
-            mouse_x = (mouse_px - offset_x) / safe_scale
-            mouse_y = (inv_mouse_py - offset_y) / safe_scale
+            mouse_x, mouse_y = setup_menu_viewport_and_convert_mouse(content_vp, base_total_width, base_height,
+                                                                     fb_height, offset_x, offset_y, scale, window)
 
             if current_game_state == GAME_STATE_MENU:
                 if menu_state.active_menu == "main":
@@ -1200,25 +1189,50 @@ def main():
 
             # --- 2. DESENHA O MENU DE PAUSA POR CIMA ---
             # Configura a viewport para cobrir toda a área de conteúdo
-            glViewport(content_vp[0], content_vp[1], content_vp[2], content_vp[3])
-            glMatrixMode(GL_PROJECTION)
-            glLoadIdentity()
-            gluOrtho2D(0, base_total_width, 0, base_height)
-            glMatrixMode(GL_MODELVIEW)
-            glLoadIdentity()
-
-            # Converte as coordenadas do mouse para o sistema lógico do menu
-            mouse_px, mouse_py = glfw.get_cursor_pos(window)
-            inv_mouse_py = fb_height - mouse_py
-            safe_scale = scale if scale and scale > 0.0 else 1e-6
-            mouse_x = (mouse_px - offset_x) / safe_scale
-            mouse_y = (inv_mouse_py - offset_y) / safe_scale
+            mouse_x, mouse_y = setup_menu_viewport_and_convert_mouse(content_vp, base_total_width, base_height,
+                                                                     fb_height, offset_x, offset_y, scale, window)
 
             draw_pause_menu(menu_state, mouse_x, mouse_y)
 
         glfw.swap_buffers(window)
 
     glfw.terminate()
+
+
+def setup_menu_viewport_and_convert_mouse(content_vp, base_total_width, base_height, fb_height, offset_x, offset_y,
+                                          scale, window):
+    """
+    Configura a viewport do menu e converte as coordenadas do mouse para o sistema de coordenadas lógico.
+
+    Args:
+        content_vp: Viewport de conteúdo (x, y, largura, altura)
+        base_total_width: Largura total base
+        base_height: Altura base
+        fb_height: Altura do framebuffer
+        offset_x: Deslocamento X
+        offset_y: Deslocamento Y
+        scale: Escala de renderização
+        window: Janela GLFW
+
+    Returns:
+        Tuple com as coordenadas lógicas do mouse (mouse_x, mouse_y)
+    """
+    # Configura a viewport para cobrir toda a área de conteúdo
+    glViewport(content_vp[0], content_vp[1], content_vp[2], content_vp[3])
+    glMatrixMode(GL_PROJECTION)
+    glLoadIdentity()
+    gluOrtho2D(0, base_total_width, 0, base_height)
+    glMatrixMode(GL_MODELVIEW)
+    glLoadIdentity()
+
+    # Converte as coordenadas do mouse para o sistema lógico do menu
+    mouse_px, mouse_py = glfw.get_cursor_pos(window)
+    inv_mouse_py = fb_height - mouse_py
+    safe_scale = scale if scale and scale > 0.0 else 1e-6
+    mouse_x = (mouse_px - offset_x) / safe_scale
+    mouse_y = (inv_mouse_py - offset_y) / safe_scale
+
+    return mouse_x, mouse_y
 
 
 def get_safe_lane_for_powerup(powerups, lane_count, screen_height, safety_dist):
