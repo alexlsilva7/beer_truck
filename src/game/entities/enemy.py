@@ -2,12 +2,12 @@ from OpenGL.GL import *
 import random
 from src.game.entities.road import ROAD_WIDTH, GAME_WIDTH, SCREEN_HEIGHT, LANE_WIDTH, LANE_COUNT_PER_DIRECTION, PLAYER_SPEED
 from src.utils.debug_utils import draw_hitbox, draw_collision_area, draw_real_hitbox
+from src.game.entities.base_drawable import DrawableGameObject
 
 
-class Enemy:
+class Enemy(DrawableGameObject):
     def __init__(self, texture_id, dead_texture_id=None, is_up_lane=True, lane_index=None, speed_multiplier=1.0):
         """Inicializa as propriedades do inimigo com uma textura específica."""
-        self.texture_id = texture_id
         self.dead_texture_id = dead_texture_id
         self.width = 50
         self.height = 100
@@ -33,8 +33,11 @@ class Enemy:
             self.speed_y = (PLAYER_SPEED + random.uniform(0.02, 0.1)) * speed_multiplier
 
         lane_x_start = road_x_start_total + self.lane_index * LANE_WIDTH
-        self.x = lane_x_start + (LANE_WIDTH - self.width) / 2
-        self.y = SCREEN_HEIGHT
+        x = lane_x_start + (LANE_WIDTH - self.width) / 2
+        y = SCREEN_HEIGHT
+
+        # Chama o construtor da classe base
+        super().__init__(texture_id, x, y, self.width, self.height)
 
     def update(self, all_enemies, speed_multiplier=1.0):
         """Move o inimigo e evita colisões com outros inimigos."""
@@ -59,28 +62,23 @@ class Enemy:
 
     def draw(self):
         """Desenha o inimigo na tela usando sua textura."""
-        glEnable(GL_TEXTURE_2D)
-        glEnable(GL_BLEND)
-        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
+        # Altera a textura a ser usada se o inimigo estiver crashado e tiver uma textura 'dead'
+        if self.crashed and self.dead_texture_id:
+            current_texture = self.dead_texture_id
+            # Salva a textura original
+            original_texture = self.texture_id
+            # Atualiza temporariamente a textura para desenhar
+            self.texture_id = current_texture
 
-        # Usa textura "dead" se o inimigo colidiu e tem textura dead
-        current_texture = self.dead_texture_id if self.crashed and self.dead_texture_id else self.texture_id
-        glBindTexture(GL_TEXTURE_2D, current_texture)
-        
-        # Garante que a cor está resetada
-        glColor4f(1.0, 1.0, 1.0, 1.0)
+            # Chama o metodo draw da classe base
+            super().draw()
 
-        glBegin(GL_QUADS)
-        glTexCoord2f(0, 1); glVertex2f(self.x, self.y)
-        glTexCoord2f(1, 1); glVertex2f(self.x + self.width, self.y)
-        glTexCoord2f(1, 0); glVertex2f(self.x + self.width, self.y + self.height)
-        glTexCoord2f(0, 0); glVertex2f(self.x, self.y + self.height)
-        glEnd()
-        
-        # Reseta a cor para não afetar outros elementos
-        glColor4f(1.0, 1.0, 1.0, 1.0)
-        glDisable(GL_TEXTURE_2D)
-        glDisable(GL_BLEND)
+            # Restaura a textura original
+            self.texture_id = original_texture
+        else:
+            # Se não está crashado ou não tem textura de dead, usa o draw normal da classe base
+            super().draw()
+
 
     def draw_debug_hitbox(self, show_collision_area=True):
         """Desenha a hitbox de debug para visualização."""

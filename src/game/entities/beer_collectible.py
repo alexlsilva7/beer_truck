@@ -2,17 +2,16 @@ from OpenGL.GL import *
 import random
 from src.game.entities.road import ROAD_WIDTH, GAME_WIDTH, SCREEN_HEIGHT, LANE_WIDTH, LANE_COUNT_PER_DIRECTION, PLAYER_SPEED
 from src.utils.debug_utils import draw_hitbox, draw_collision_area, draw_real_hitbox
+from src.game.entities.base_drawable import DrawableGameObject
 
 
-class BeerCollectible:
+class BeerCollectible(DrawableGameObject):
     def __init__(self, texture_id, lane_index=None, speed_multiplier=1.0):
         """Inicializa as propriedades do objeto de cerveja coletável."""
-        self.texture_id = texture_id
         # Tamanho do objeto de cerveja - aumentado horizontalmente
-        self.width = LANE_WIDTH * 0.8  # 80% da largura da faixa (era 50%)
-        self.height = 60  # Aumentado ligeiramente a altura também
+        width = LANE_WIDTH * 0.8  # 80% da largura da faixa (era 50%)
+        height = 60  # Aumentado ligeiramente a altura também
         self.speed_multiplier = speed_multiplier
-        self.active = True  # Indica se o objeto ainda está ativo (não foi coletado)
         self.points = 100  # Pontos que o jogador ganha ao coletar
 
         road_x_start_total = (GAME_WIDTH - ROAD_WIDTH) / 2
@@ -28,8 +27,11 @@ class BeerCollectible:
 
         lane_x_start = road_x_start_total + self.lane_index * LANE_WIDTH
         # Centraliza o objeto na faixa
-        self.x = lane_x_start + (LANE_WIDTH - self.width) / 2
-        self.y = SCREEN_HEIGHT
+        x = lane_x_start + (LANE_WIDTH - width) / 2
+        y = SCREEN_HEIGHT
+
+        # Chama o construtor da classe base
+        super().__init__(texture_id, x, y, width, height)
 
     def update(self, scroll_speed=None):
         """Move o objeto de cerveja para baixo usando a velocidade atual do scrolling."""
@@ -41,39 +43,6 @@ class BeerCollectible:
             else:
                 # Usa a velocidade original se nenhuma velocidade de rolagem for fornecida
                 self.y -= self.speed_y
-    
-    def draw(self):
-        """Desenha o objeto de cerveja na tela usando sua textura."""
-        if not self.active:
-            return
-        
-        # Salva o estado atual para não afetar outros objetos
-        glPushMatrix()
-        glPushAttrib(GL_ALL_ATTRIB_BITS)
-            
-        # Desabilita depth test para garantir que a transparência funcione
-        glDisable(GL_DEPTH_TEST)
-        
-        glEnable(GL_TEXTURE_2D)
-        glEnable(GL_BLEND)
-        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
-        
-        # Desenha a textura do objeto normalmente
-        glBindTexture(GL_TEXTURE_2D, self.texture_id)
-        
-        # Cor branca para não alterar a textura
-        glColor4f(1.0, 1.0, 1.0, 1.0)
-
-        glBegin(GL_QUADS)
-        glTexCoord2f(0, 1); glVertex2f(self.x, self.y)
-        glTexCoord2f(1, 1); glVertex2f(self.x + self.width, self.y)
-        glTexCoord2f(1, 0); glVertex2f(self.x + self.width, self.y + self.height)
-        glTexCoord2f(0, 0); glVertex2f(self.x, self.y + self.height)
-        glEnd()
-
-        # Restaura o estado anterior
-        glPopAttrib()
-        glPopMatrix()
 
     def check_collision(self, truck):
         """Verifica se o caminhão colidiu com o objeto de cerveja usando hitboxes mais precisas."""
