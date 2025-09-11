@@ -19,7 +19,7 @@ from src.game.entities.hole import Hole
 from src.game.entities.oil_stain import OilStain
 from src.game.entities.beer_collectible import BeerCollectible
 from src.utils.collision_utils import check_rect_collision
-from src.utils.invulnerability import InvulnerabilityPowerUp
+from src.game.entities.invulnerability import InvulnerabilityPowerUp
 from src.ui.score_indicator import ScoreIndicator
 from src.utils.texture_loader import load_texture
 from src.ui.menu import MenuState, draw_start_menu, draw_instructions_screen, draw_game_over_menu, draw_name_input_screen, draw_lives, draw_pause_menu
@@ -32,6 +32,9 @@ GAME_STATE_MENU = 0
 GAME_STATE_PLAYING = 1
 GAME_STATE_GAME_OVER = 2
 GAME_STATE_PAUSED = 3
+
+# --- Debug ---
+DEBUG_SHOW_HITBOXES = False  # Pressione 'H' para alternar
 
 # --- Variáveis Globais para Toggle Borderless ---
 is_borderless = False
@@ -193,6 +196,11 @@ def key_callback(window, key, scancode, action, mods):
         elif key == glfw.KEY_V:
             # Aumentar probabilidade de spawn da cerveja
             difficulty_manager.adjust_beer_spawn_probability(0.05)
+        elif key == glfw.KEY_H:
+            # Toggle debug hitboxes
+            global DEBUG_SHOW_HITBOXES
+            DEBUG_SHOW_HITBOXES = not DEBUG_SHOW_HITBOXES
+            print(f"Debug hitboxes: {'ON' if DEBUG_SHOW_HITBOXES else 'OFF'}")
 
 
 def mouse_button_callback(window, button, action, mods):
@@ -1076,6 +1084,37 @@ def main():
             # Desenha o carro da polícia se ele existir
             if police_car:
                 police_car.draw()
+
+            # --- Debug: Desenha hitboxes se ativado ---
+            if DEBUG_SHOW_HITBOXES:
+                # Hitbox do player truck (vermelho com área de colisão verde)
+                player_truck.draw_debug_hitbox()
+                
+                # Hitboxes dos inimigos (azul com área de colisão amarela)
+                for enemy in enemies_up:
+                    enemy.draw_debug_hitbox()
+                for enemy in enemies_down:
+                    enemy.draw_debug_hitbox()
+                
+                # Hitboxes das cervejas (laranja com área de colisão ciano)
+                for beer in beer_collectibles:
+                    beer.draw_debug_hitbox()
+                
+                # Hitboxes da polícia (azul com área de colisão azul brilhante)
+                if police_car:
+                    police_car.draw_debug_hitbox()
+                
+                # Hitboxes dos buracos (marrom com área de colisão laranja)
+                for hole in holes:
+                    hole.draw_debug_hitbox()
+                
+                # Hitboxes das manchas de óleo (roxo com área de colisão magenta)
+                for oil in oil_stains:
+                    oil.draw_debug_hitbox()
+                
+                # Hitboxes dos power-ups de invulnerabilidade (verde com área de colisão verde brilhante)
+                for powerup in invulnerability_powerups:
+                    powerup.draw_debug_hitbox()
 
             # --- Panel Viewport (scaled) ---
             glViewport(panel_vp[0], panel_vp[1], panel_vp[2], panel_vp[3])

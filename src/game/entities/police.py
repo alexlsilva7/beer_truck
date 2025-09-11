@@ -1,6 +1,7 @@
 # Ficheiro: police.py
 from OpenGL.GL import *
 from src.game.entities.road import SCREEN_HEIGHT, ROAD_WIDTH, GAME_WIDTH, PLAYER_SPEED
+from src.utils.debug_utils import draw_hitbox, draw_real_hitbox
 import random
 import threading
 import src.game.managers.audio_manager as audio_manager
@@ -109,9 +110,40 @@ class PoliceCar:
             self._player = None
 
     def _check_rear_end_collision(self, target):
-        is_horizontally_aligned = (self.x < target.x + target.width and self.x + self.width > target.x)
-        is_vertically_close = (self.y + self.height >= target.y and self.y < target.y)
-        return is_horizontally_aligned and is_vertically_close
+        # Calcula as hitboxes efetivas da polícia
+        police_hitbox_width = self.width / 1.3  # Ajustável
+        police_hitbox_height = self.height / 1.1  # ← SINCRONIZADO COM O CAMINHÃO
+        police_hitbox_x = self.x + (self.width - police_hitbox_width) / 2
+        police_hitbox_y = self.y + (self.height - police_hitbox_height) / 2
+        
+        # Calcula as hitboxes efetivas do alvo
+        target_hitbox_width = target.width / 1.3
+        target_hitbox_height = target.height / 1.1  # ← SINCRONIZADO COM O CAMINHÃO
+        target_hitbox_x = target.x + (target.width - target_hitbox_width) / 2
+        target_hitbox_y = target.y + (target.height - target_hitbox_height) / 2
+        
+        # Verifica sobreposição das hitboxes
+        return (police_hitbox_x < target_hitbox_x + target_hitbox_width and
+                police_hitbox_x + police_hitbox_width > target_hitbox_x and
+                police_hitbox_y < target_hitbox_y + target_hitbox_height and
+                police_hitbox_y + police_hitbox_height > target_hitbox_y)
+
+    def draw_debug_hitbox(self, show_collision_area=True):
+        """Desenha a hitbox de debug para visualização."""
+        # Desenha o retângulo completo do sprite (azul para polícia)
+        draw_hitbox(self.x, self.y, self.width, self.height, 
+                   color=(0.0, 0.0, 1.0, 0.8), line_width=2)
+        
+        if show_collision_area:
+            # Calcula a hitbox REAL que é usada para colisão
+            police_hitbox_width = self.width / 1.3  # ← VOCÊ PODE ALTERAR AQUI
+            police_hitbox_height = self.height / 1.1  # ← SINCRONIZADO COM A COLISÃO REAL
+            police_hitbox_x = self.x + (self.width - police_hitbox_width) / 2
+            police_hitbox_y = self.y + (self.height - police_hitbox_height) / 2
+            
+            # Desenha a hitbox REAL de colisão (azul brilhante para polícia)
+            draw_real_hitbox(police_hitbox_x, police_hitbox_y, police_hitbox_width, police_hitbox_height,
+                           color=(0.0, 0.5, 1.0, 1.0))
 
     def update(self, player_truck, all_enemies, scroll_speed):
         if self.crashed:

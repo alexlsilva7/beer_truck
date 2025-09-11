@@ -1,5 +1,6 @@
 from OpenGL.GL import *
 from src.game.entities.road import ROAD_WIDTH, GAME_WIDTH, SCREEN_HEIGHT
+from src.utils.debug_utils import draw_hitbox, draw_collision_area, draw_real_hitbox
 import time
 
 
@@ -163,70 +164,119 @@ class Truck:
                 self.take_damage()  # Comportamento original: crash e queda
 
     def check_collision(self, other):
-        """Verifica a colisão com outro objeto (inimigo)."""
-        # Sempre verifica a colisão - a proteção contra dano é tratada em outro lugar
-        return (self.x < other.x + other.width and
-                self.x + self.width > other.x and
-                self.y < other.y + other.height and
-                self.y + self.height > other.y)
+        """Verifica a colisão com outro objeto (inimigo) usando hitboxes mais precisas."""
+        # Calcula as hitboxes efetivas
+        truck_hitbox_width = self.width / 1.3  # Aumentado para colisão mais realística
+        truck_hitbox_height = self.height / 1.1
+        
+        # Centraliza a hitbox no sprite
+        truck_hitbox_x = self.x + (self.width - truck_hitbox_width) / 2
+        truck_hitbox_y = self.y + (self.height - truck_hitbox_height) / 2
+        
+        # Para o inimigo, usa os mesmos valores proporcionais
+        other_hitbox_width = other.width / 1.3
+        other_hitbox_height = other.height / 1.05
+        
+        other_hitbox_x = other.x + (other.width - other_hitbox_width) / 2
+        other_hitbox_y = other.y + (other.height - other_hitbox_height) / 2
+        
+        # Verifica sobreposição dos retângulos das hitboxes
+        return (truck_hitbox_x < other_hitbox_x + other_hitbox_width and
+                truck_hitbox_x + truck_hitbox_width > other_hitbox_x and
+                truck_hitbox_y < other_hitbox_y + other_hitbox_height and
+                truck_hitbox_y + truck_hitbox_height > other_hitbox_y)
+
+    def draw_debug_hitbox(self, show_collision_area=True):
+        """Desenha a hitbox de debug para visualização."""
+        # Desenha o retângulo completo do sprite (vermelho)
+        draw_hitbox(self.x, self.y, self.width, self.height, 
+                   color=(1.0, 0.0, 0.0, 0.8), line_width=2)
+        
+        if show_collision_area:
+            # Calcula a hitbox REAL que é usada para colisão
+            truck_hitbox_width = self.width / 1.3
+            truck_hitbox_height = self.height / 1.1
+            truck_hitbox_x = self.x + (self.width - truck_hitbox_width) / 2
+            truck_hitbox_y = self.y + (self.height - truck_hitbox_height) / 2
+            
+            # Desenha a hitbox REAL de colisão (ciano brilhante)
+            draw_real_hitbox(truck_hitbox_x, truck_hitbox_y, truck_hitbox_width, truck_hitbox_height,
+                           color=(0.0, 1.0, 1.0, 1.0))
                 
     def check_hole_collision(self, hole):
         """Verifica a colisão com um buraco."""
         if not hole.active or self.crashed:
             return False
         
-        # Usando um sistema de colisão baseado no centro e com área ajustada
-        truck_center_x = self.x + self.width / 2
-        truck_center_y = self.y + self.height / 2
+        # Calcula as hitboxes efetivas do caminhão (igual aos outros métodos)
+        truck_hitbox_width = self.width / 1.3  # ← MESMO SISTEMA DE HITBOXES
+        truck_hitbox_height = self.height / 1.1  # ← MESMO SISTEMA DE HITBOXES
         
-        hole_center_x = hole.x + hole.width / 2
-        hole_center_y = hole.y + hole.height / 2
+        truck_hitbox_x = self.x + (self.width - truck_hitbox_width) / 2
+        truck_hitbox_y = self.y + (self.height - truck_hitbox_height) / 2
         
-        # Distância máxima para considerar colisão (ajustada para o novo tamanho)
-        max_x_distance = (self.width + hole.width) / 3    # Colisão mais precisa
-        max_y_distance = (self.height + hole.height) / 3.5  # Colisão mais precisa
+        # Para o buraco, usa uma hitbox igual à visualização
+        hole_hitbox_width = hole.width / 1.6  # ← AJUSTÁVEL
+        hole_hitbox_height = hole.height / 1.5  # ← AJUSTÁVEL
         
-        # Verifica se os centros estão próximos o suficiente
-        return (abs(truck_center_x - hole_center_x) < max_x_distance and
-                abs(truck_center_y - hole_center_y) < max_y_distance)
+        hole_hitbox_x = hole.x + (hole.width - hole_hitbox_width) / 2
+        hole_hitbox_y = hole.y + (hole.height - hole_hitbox_height) / 2
+        
+        # Verifica sobreposição dos retângulos das hitboxes
+        return (truck_hitbox_x < hole_hitbox_x + hole_hitbox_width and
+                truck_hitbox_x + truck_hitbox_width > hole_hitbox_x and
+                truck_hitbox_y < hole_hitbox_y + hole_hitbox_height and
+                truck_hitbox_y + truck_hitbox_height > hole_hitbox_y)
         
     def check_oil_stain_collision(self, oil_stain):
         """Verifica a colisão com uma mancha de óleo."""
         if not oil_stain.active or self.crashed:
             return False
         
-        # Usando um sistema de colisão baseado no centro e com área ajustada
-        truck_center_x = self.x + self.width / 2
-        truck_center_y = self.y + self.height / 2
+        # Calcula as hitboxes efetivas do caminhão (igual aos outros métodos)
+        truck_hitbox_width = self.width / 1.3  # ← MESMO SISTEMA DE HITBOXES
+        truck_hitbox_height = self.height / 1.1  # ← MESMO SISTEMA DE HITBOXES
         
-        oil_center_x = oil_stain.x + oil_stain.width / 2
-        oil_center_y = oil_stain.y + oil_stain.height / 2
+        truck_hitbox_x = self.x + (self.width - truck_hitbox_width) / 2
+        truck_hitbox_y = self.y + (self.height - truck_hitbox_height) / 2
         
-        # Distância máxima para considerar colisão
-        max_x_distance = (self.width + oil_stain.width) / 3
-        max_y_distance = (self.height + oil_stain.height) / 3
+        # Para o óleo, usa uma hitbox ligeiramente maior que a visualização
+        oil_hitbox_width = oil_stain.width / 1.2  # ← AJUSTÁVEL
+        oil_hitbox_height = oil_stain.height / 1.2  # ← AJUSTÁVEL
         
-        return (abs(truck_center_x - oil_center_x) < max_x_distance and
-                abs(truck_center_y - oil_center_y) < max_y_distance)
+        oil_hitbox_x = oil_stain.x + (oil_stain.width - oil_hitbox_width) / 2
+        oil_hitbox_y = oil_stain.y + (oil_stain.height - oil_hitbox_height) / 2
+        
+        # Verifica sobreposição dos retângulos das hitboxes
+        return (truck_hitbox_x < oil_hitbox_x + oil_hitbox_width and
+                truck_hitbox_x + truck_hitbox_width > oil_hitbox_x and
+                truck_hitbox_y < oil_hitbox_y + oil_hitbox_height and
+                truck_hitbox_y + truck_hitbox_height > oil_hitbox_y)
                 
     def check_invulnerability_powerup_collision(self, powerup):
         """Verifica a colisão com um power-up de invulnerabilidade."""
         if not powerup.active or self.crashed:
             return False
         
-        # Usando um sistema de colisão baseado no centro e com área ajustada
-        truck_center_x = self.x + self.width / 2
-        truck_center_y = self.y + self.height / 2
+        # Calcula as hitboxes efetivas do caminhão (igual aos outros métodos)
+        truck_hitbox_width = self.width / 1.3  # ← MESMO SISTEMA DE HITBOXES
+        truck_hitbox_height = self.height / 1.1  # ← MESMO SISTEMA DE HITBOXES
         
-        powerup_center_x = powerup.x + powerup.width / 2
-        powerup_center_y = powerup.y + powerup.height / 2
+        truck_hitbox_x = self.x + (self.width - truck_hitbox_width) / 2
+        truck_hitbox_y = self.y + (self.height - truck_hitbox_height) / 2
         
-        # Distância máxima para considerar colisão
-        max_x_distance = (self.width + powerup.width) / 3
-        max_y_distance = (self.height + powerup.height) / 3
+        # Para o power-up, usa uma hitbox generosa
+        powerup_hitbox_width = powerup.width / 1.1  # ← AJUSTÁVEL
+        powerup_hitbox_height = powerup.height / 1.1  # ← AJUSTÁVEL
         
-        return (abs(truck_center_x - powerup_center_x) < max_x_distance and
-                abs(truck_center_y - powerup_center_y) < max_y_distance)
+        powerup_hitbox_x = powerup.x + (powerup.width - powerup_hitbox_width) / 2
+        powerup_hitbox_y = powerup.y + (powerup.height - powerup_hitbox_height) / 2
+        
+        # Verifica sobreposição dos retângulos das hitboxes
+        return (truck_hitbox_x < powerup_hitbox_x + powerup_hitbox_width and
+                truck_hitbox_x + truck_hitbox_width > powerup_hitbox_x and
+                truck_hitbox_y < powerup_hitbox_y + powerup_hitbox_height and
+                truck_hitbox_y + truck_hitbox_height > powerup_hitbox_y)
 
     def take_damage(self):
         """O caminhão perde uma vida e inicia a sequência de 'crash'."""
