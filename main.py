@@ -1051,44 +1051,10 @@ def main():
 
         elif current_game_state == GAME_STATE_PLAYING:
             # --- Game Viewport (scaled) ---
-            glViewport(game_vp[0], game_vp[1], game_vp[2], game_vp[3])
-            glMatrixMode(GL_PROJECTION)
-            glLoadIdentity()
-            gluOrtho2D(0, BASE_GAME_WIDTH, 0, BASE_HEIGHT)
-            glMatrixMode(GL_MODELVIEW)
-            glLoadIdentity()
-
-            draw_road(scroll_pos)
-
-            # Desenha os buracos e manchas primeiro (para ficarem "abaixo" dos carros)
-            for hole in holes:
-                hole.draw()
-
-            # Desenha as manchas de óleo
-            for oil_stain in oil_stains:
-                oil_stain.draw()
-
-            # Desenha as cervejas colecionáveis
-            for beer in beer_collectibles:
-                beer.draw()
-
-            # Desenha os indicadores de pontos
-            for indicator in score_indicators:
-                indicator.draw()
-
-            # Desenha os power-ups de invulnerabilidade
-            for powerup in invulnerability_powerups:
-                powerup.draw()
-
-            player_truck.draw()
-            for enemy in enemies_up:
-                enemy.draw()
-            for enemy in enemies_down:
-                enemy.draw()
-
-            # Desenha o carro da polícia se ele existir
-            if police_car:
-                police_car.draw()
+            # Usar a mesma função para desenhar os elementos do jogo na tela de pausa
+            draw_game_elements(game_vp, BASE_GAME_WIDTH, BASE_HEIGHT, scroll_pos, holes, oil_stains, beer_collectibles,
+                               score_indicators, invulnerability_powerups, player_truck, enemies_up, enemies_down,
+                               police_car)
 
             # --- Debug: Desenha hitboxes se ativado ---
             if DEBUG_SHOW_HITBOXES:
@@ -1255,25 +1221,9 @@ def main():
             # A lógica de desenho é a mesma do estado 'PLAYING', mas sem a lógica de update.
 
             # --- Game Viewport (scaled) ---
-            glViewport(game_vp[0], game_vp[1], game_vp[2], game_vp[3])
-            glMatrixMode(GL_PROJECTION)
-            glLoadIdentity()
-            gluOrtho2D(0, BASE_GAME_WIDTH, 0, BASE_HEIGHT)
-            glMatrixMode(GL_MODELVIEW)
-            glLoadIdentity()
-
-            draw_road(scroll_pos)
-
-            for hole in holes: hole.draw()
-            for oil_stain in oil_stains: oil_stain.draw()
-            for beer in beer_collectibles: beer.draw()
-            for indicator in score_indicators: indicator.draw()
-            for powerup in invulnerability_powerups: powerup.draw()
-
-            player_truck.draw()
-            for enemy in enemies_up: enemy.draw()
-            for enemy in enemies_down: enemy.draw()
-            if police_car: police_car.draw()
+            draw_game_elements(game_vp, BASE_GAME_WIDTH, BASE_HEIGHT, scroll_pos, holes, oil_stains, beer_collectibles,
+                               score_indicators, invulnerability_powerups, player_truck, enemies_up, enemies_down,
+                               police_car)
 
             # --- Panel Viewport (scaled) ---
             glViewport(panel_vp[0], panel_vp[1], panel_vp[2], panel_vp[3])
@@ -1322,6 +1272,48 @@ def main():
         glfw.swap_buffers(window)
 
     glfw.terminate()
+
+def draw_game_elements(game_vp, base_game_width, base_height, scroll_pos, holes, oil_stains, beer_collectibles,
+                       score_indicators, invulnerability_powerups, player_truck, enemies_up, enemies_down, police_car):
+    # Configuração da viewport e projeção
+    glViewport(game_vp[0], game_vp[1], game_vp[2], game_vp[3])
+    glMatrixMode(GL_PROJECTION)
+    glLoadIdentity()
+    gluOrtho2D(0, base_game_width, 0, base_height)
+    glMatrixMode(GL_MODELVIEW)
+    glLoadIdentity()
+
+    draw_road(scroll_pos)
+
+    # Desenha os buracos e manchas primeiro (para ficarem "abaixo" dos carros)
+    for hole in holes:
+        hole.draw()
+
+    # Desenha as manchas de óleo
+    for oil_stain in oil_stains:
+        oil_stain.draw()
+
+    # Desenha as cervejas colecionáveis
+    for beer in beer_collectibles:
+        beer.draw()
+
+    # Desenha os indicadores de pontos
+    for indicator in score_indicators:
+        indicator.draw()
+
+    # Desenha os power-ups de invulnerabilidade
+    for powerup in invulnerability_powerups:
+        powerup.draw()
+
+    player_truck.draw()
+    for enemy in enemies_up:
+        enemy.draw()
+    for enemy in enemies_down:
+        enemy.draw()
+
+    # Desenha o carro da polícia se ele existir
+    if police_car:
+        police_car.draw()
 
 if __name__ == "__main__":
     main()
