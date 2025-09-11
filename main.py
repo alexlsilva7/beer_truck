@@ -1,11 +1,10 @@
 import math
-import time
 import random
+import time
 
 import glfw
 import pygame
 from OpenGL.GL import *
-from OpenGL.GLU import *
 from OpenGL.GLUT import *
 from OpenGL.GLUT import GLUT_BITMAP_HELVETICA_18
 
@@ -17,8 +16,8 @@ from src.game.entities.enemy import Enemy, EnemyDown
 from src.game.entities.hole import Hole
 from src.game.entities.invulnerability import InvulnerabilityPowerUp
 from src.game.entities.oil_stain import OilStain
-from src.game.entities.road import draw_road, SCREEN_WIDTH, SCREEN_HEIGHT, GAME_WIDTH, PANEL_WIDTH, COLOR_PANEL, \
-    draw_rect, PLAYER_SPEED, \
+from src.game.entities.road import SCREEN_WIDTH, SCREEN_HEIGHT, GAME_WIDTH, PANEL_WIDTH, COLOR_PANEL, \
+    PLAYER_SPEED, \
     LANE_COUNT_PER_DIRECTION
 from src.game.entities.truck import Truck
 from src.game.managers.difficulty_manager import DifficultyManager

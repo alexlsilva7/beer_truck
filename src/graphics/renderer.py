@@ -3,6 +3,8 @@ from OpenGL.GLU import *
 from OpenGL.raw.GLUT import glutBitmapCharacter
 from OpenGL.GLUT import GLUT_BITMAP_HELVETICA_18
 
+from src.game.entities.road import draw_road
+
 
 def draw_game_elements(game_vp, base_game_width, base_height, e_scroll_pos, e_holes, e_oil_stains, e_beer_collectibles,
                        e_score_indicators, e_invulnerability_powerups, e_player_truck, e_enemies_up, e_enemies_down, e_police_car):
@@ -14,7 +16,6 @@ def draw_game_elements(game_vp, base_game_width, base_height, e_scroll_pos, e_ho
     glMatrixMode(GL_MODELVIEW)
     glLoadIdentity()
 
-    from main import draw_road  # Importe local para evitar importação circular
     draw_road(e_scroll_pos)
 
     # Desenha os buracos e manchas primeiro (para ficarem "abaixo" dos carros)

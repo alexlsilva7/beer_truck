@@ -2,6 +2,9 @@ import glfw
 from OpenGL.GL import *
 from OpenGL.GLU import *
 
+from src.game.entities.road import draw_rect
+
+
 def setup_menu_viewport_and_convert_mouse(content_vp, base_total_width, base_height, fb_height, offset_x, offset_y,
                                           scale, window):
     # Configura a viewport para cobrir toda a área de conteúdo
@@ -32,7 +35,6 @@ def setup_panel_viewport(panel_vp, base_panel_width, base_height, panel_width, s
     glLoadIdentity()
 
     # Painel lateral - fundo
-    from main import draw_rect  # Importe local para evitar importação circular
     draw_rect(0, 0, panel_width, screen_height, color_panel)
     time_elapsed = glfw.get_time()
 
