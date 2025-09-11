@@ -1071,19 +1071,8 @@ def main():
                     powerup.draw_debug_hitbox()
 
             # --- Panel Viewport (scaled) ---
-            glViewport(panel_vp[0], panel_vp[1], panel_vp[2], panel_vp[3])
-            glMatrixMode(GL_PROJECTION)
-            glLoadIdentity()
-            gluOrtho2D(0, BASE_PANEL_WIDTH, 0, BASE_HEIGHT)
-            glMatrixMode(GL_MODELVIEW)
-            glLoadIdentity()
-
-            # Painel lateral - fundo
-            draw_rect(0, 0, PANEL_WIDTH, SCREEN_HEIGHT, COLOR_PANEL)
-            time_elapsed = glfw.get_time()
-
-            # Calcula a velocidade considerando o efeito do buraco com transição suave
-            base_speed = abs(scroll_speed * 400)
+            time_elapsed, base_speed = setup_panel_viewport(panel_vp, BASE_PANEL_WIDTH, BASE_HEIGHT, PANEL_WIDTH,
+                                                            SCREEN_HEIGHT, COLOR_PANEL, scroll_speed)
             if player_truck.slowed_down:
                 # Usa o fator de velocidade atual que muda gradualmente
                 displayed_speed = base_speed * player_truck.current_speed_factor
@@ -1209,17 +1198,9 @@ def main():
                                police_car)
 
             # --- Panel Viewport (scaled) ---
-            glViewport(panel_vp[0], panel_vp[1], panel_vp[2], panel_vp[3])
-            glMatrixMode(GL_PROJECTION)
-            glLoadIdentity()
-            gluOrtho2D(0, BASE_PANEL_WIDTH, 0, BASE_HEIGHT)
-            glMatrixMode(GL_MODELVIEW)
-            glLoadIdentity()
+            time_elapsed, base_speed = setup_panel_viewport(panel_vp, BASE_PANEL_WIDTH, BASE_HEIGHT, PANEL_WIDTH,
+                                                            SCREEN_HEIGHT, COLOR_PANEL, scroll_speed)
 
-            # Re-desenha o painel lateral para que ele também fique visível
-            draw_rect(0, 0, PANEL_WIDTH, SCREEN_HEIGHT, COLOR_PANEL)
-            time_elapsed = glfw.get_time()
-            base_speed = abs(scroll_speed * 400)
             displayed_speed = base_speed * player_truck.current_speed_factor if player_truck.slowed_down else base_speed
             score = abs(scroll_pos * 0.1) + beer_bonus_points
 
@@ -1269,6 +1250,22 @@ def get_safe_lanes_for_obstacles(oil_stains, lane_count_per_direction, screen_he
 
     return safe_lanes, all_lanes
 
+def setup_panel_viewport(panel_vp, base_panel_width, base_height, panel_width, screen_height, color_panel, scroll_speed):
+    """Configura a viewport do painel lateral e desenha o fundo"""
+    glViewport(panel_vp[0], panel_vp[1], panel_vp[2], panel_vp[3])
+    glMatrixMode(GL_PROJECTION)
+    glLoadIdentity()
+    gluOrtho2D(0, base_panel_width, 0, base_height)
+    glMatrixMode(GL_MODELVIEW)
+    glLoadIdentity()
+
+    # Painel lateral - fundo
+    draw_rect(0, 0, panel_width, screen_height, color_panel)
+    time_elapsed = glfw.get_time()
+
+    # Calcula a velocidade considerando o efeito do buraco com transição suave
+    base_speed = abs(scroll_speed * 400)
+    return time_elapsed, base_speed
 
 def draw_game_elements(game_vp, base_game_width, base_height, scroll_pos, holes, oil_stains, beer_collectibles,
                        score_indicators, invulnerability_powerups, player_truck, enemies_up, enemies_down, police_car):
