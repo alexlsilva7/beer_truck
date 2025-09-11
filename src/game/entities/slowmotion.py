@@ -4,17 +4,17 @@ import math
 import time
 from src.game.entities.road import ROAD_WIDTH, GAME_WIDTH, SCREEN_HEIGHT, LANE_WIDTH, LANE_COUNT_PER_DIRECTION, PLAYER_SPEED
 from src.utils.debug_utils import draw_hitbox, draw_real_hitbox
+from src.game.entities.base_drawable import DrawableGameObject
 
 
-class SlowMotionPowerUp:
+class SlowMotionPowerUp(DrawableGameObject):
     def __init__(self, texture_id, lane_index=None, speed_multiplier=1.0):
         """Inicializa as propriedades do power-up de slow motion na pista."""
-        self.texture_id = texture_id
         # Tamanho do power-up, similar aos outros elementos
-        self.width = LANE_WIDTH * 0.9  # 90% da largura da faixa
-        self.height = 70
+        width = LANE_WIDTH * 0.9  # 90% da largura da faixa
+        height = 70
         self.speed_multiplier = speed_multiplier
-        self.active = True  # Indica se o power-up ainda está ativo (não foi coletado)
+        self.points = 0  # Não dá pontos, apenas efeito
 
         road_x_start_total = (GAME_WIDTH - ROAD_WIDTH) / 2
         if lane_index is None:
@@ -29,8 +29,11 @@ class SlowMotionPowerUp:
 
         lane_x_start = road_x_start_total + self.lane_index * LANE_WIDTH
         # Centraliza melhor o power-up na faixa
-        self.x = lane_x_start + (LANE_WIDTH - self.width) / 2
-        self.y = SCREEN_HEIGHT
+        x = lane_x_start + (LANE_WIDTH - width) / 2
+        y = SCREEN_HEIGHT
+
+        # Chama o construtor da classe base
+        super().__init__(texture_id, x, y, width, height)
 
     def update(self, scroll_speed=None):
         """Move o power-up para baixo usando a velocidade atual do scrolling."""
@@ -43,56 +46,37 @@ class SlowMotionPowerUp:
                 # Usa a velocidade original se nenhuma velocidade de rolagem for fornecida
                 self.y -= self.speed_y
 
-    def draw(self):
-        """Desenha o power-up na tela usando sua textura."""
+    def check_collision(self, truck):
+        """Verifica se o caminhão colidiu com o power-up usando hitboxes mais precisas."""
         if not self.active:
-            return
+            return False
 
-        # Salva o estado atual para não afetar outros objetos
-        glPushMatrix()
-        
-        # Ativa blending para transparência
-        glEnable(GL_BLEND)
-        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
-        
-        # Define a cor como branca para não afetar a textura
-        glColor4f(1.0, 1.0, 1.0, 1.0)
-        
-        # Ativa o uso de texturas
-        glEnable(GL_TEXTURE_2D)
-        glBindTexture(GL_TEXTURE_2D, self.texture_id)
-        
-        # Move para a posição do power-up
-        glTranslatef(self.x, self.y, 0)
-        
-        # Desenha o retângulo do power-up com a textura
-        glBegin(GL_QUADS)
-        glTexCoord2f(0.0, 1.0)
-        glVertex2f(0, 0)
-        
-        glTexCoord2f(1.0, 1.0)
-        glVertex2f(self.width, 0)
-        
-        glTexCoord2f(1.0, 0.0)
-        glVertex2f(self.width, self.height)
-        
-        glTexCoord2f(0.0, 0.0)
-        glVertex2f(0, self.height)
-        glEnd()
-        
-        # Desativa o uso de texturas e blending
-        glDisable(GL_TEXTURE_2D)
-        glDisable(GL_BLEND)
-        
-        # Restaura o estado anterior
-        glPopMatrix()
+        # Calcula a hitbox efetiva do power-up
+        powerup_hitbox_width = self.width / 1.6  # ← AJUSTÁVEL (mais generoso)
+        powerup_hitbox_height = self.height / 1.6  # ← AJUSTÁVEL (mais generoso)
+
+        powerup_hitbox_x = self.x + (self.width - powerup_hitbox_width) / 2
+        powerup_hitbox_y = self.y + (self.height - powerup_hitbox_height) / 2
+
+        # Calcula a hitbox efetiva do caminhão (usando os mesmos valores do truck.py)
+        truck_hitbox_width = truck.width / 1.3  # Atualizado para coincidir com o truck.py
+        truck_hitbox_height = truck.height / 1.2  # Atualizado para coincidir com o truck.py
+
+        truck_hitbox_x = truck.x + (truck.width - truck_hitbox_width) / 2
+        truck_hitbox_y = truck.y + (truck.height - truck_hitbox_height) / 2
+
+        # Verifica sobreposição dos retângulos das hitboxes
+        return (powerup_hitbox_x < truck_hitbox_x + truck_hitbox_width and
+                powerup_hitbox_x + powerup_hitbox_width > truck_hitbox_x and
+                powerup_hitbox_y < truck_hitbox_y + truck_hitbox_height and
+                powerup_hitbox_y + powerup_hitbox_height > truck_hitbox_y)
 
     def get_collision_rect(self):
         """Retorna um retângulo (x, y, width, height) para detecção de colisão."""
         # Segue o mesmo padrão dos outros elementos do jogo
-        powerup_hitbox_width = self.width / 1.0  # ← AJUSTÁVEL (mais generoso)
-        powerup_hitbox_height = self.height / 1.0  # ← AJUSTÁVEL (mais generoso)
-        
+        powerup_hitbox_width = self.width / 1.6  # ← AJUSTÁVEL (mais generoso)
+        powerup_hitbox_height = self.height / 1.6  # ← AJUSTÁVEL (mais generoso)
+
         powerup_hitbox_x = self.x + (self.width - powerup_hitbox_width) / 2
         powerup_hitbox_y = self.y + (self.height - powerup_hitbox_height) / 2
         
@@ -103,13 +87,11 @@ class SlowMotionPowerUp:
             'height': powerup_hitbox_height
         }
 
-    def draw_hitbox(self):
-        """Desenha a caixa de colisão do power-up para debug."""
-        rect = self.get_collision_rect()
-        draw_hitbox(rect['x'], rect['y'], rect['width'], rect['height'])
-
     def draw_debug_hitbox(self, show_collision_area=True):
         """Desenha a hitbox de debug para visualização."""
+        if not self.active:
+            return
+
         # Desenha o contorno do power-up (roxo para slow motion)
         draw_hitbox(self.x, self.y, self.width, self.height, 
                    color=(0.8, 0.0, 0.8, 0.8), line_width=2)
@@ -128,8 +110,10 @@ class SlowMotionPowerUp:
 
     def collect(self):
         """Marca o power-up como coletado e inativo."""
-        self.active = False
-        return self.points
+        if self.active:
+            self.active = False
+            return self.points
+        return 0
 
 
 class SlowMotionEffect:
@@ -185,4 +169,3 @@ class SlowMotionEffect:
         """Desenha o filtro azulado na tela quando o efeito está ativo."""
         # Filtro visual removido - mantém apenas a funcionalidade de slow motion
         return
-        glEnable(GL_DEPTH_TEST)

@@ -1,9 +1,3 @@
-# Gerencia pré-carregamento e reprodução de sons (pygame.mixer) de forma genérica.
-# API pública:
-#   preload_sound(path) -> threading.Event
-#   get_preloaded_sounds(path) -> (full_sound, loop_sound, tmp_path)
-#   SoundPlayer(path) -> objeto com .start(), .stop(), .is_playing()
-#   stop_all() -> para todos os players ativos
 import threading
 import wave
 import tempfile

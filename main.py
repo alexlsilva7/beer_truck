@@ -1,33 +1,35 @@
-import glfw
-from OpenGL.GL import *
-from OpenGL.GLU import *
-from OpenGL.GLUT import *
-from OpenGL.GLUT import GLUT_BITMAP_HELVETICA_18  # Importação explícita para evitar erro
-import sys
-import os
+import math
 import random
 import time
-import math
-import pygame
 
-from src.game.entities.road import draw_road, SCREEN_WIDTH, SCREEN_HEIGHT, GAME_WIDTH, PANEL_WIDTH, COLOR_PANEL, draw_rect, PLAYER_SPEED, \
-    ROAD_WIDTH, LANE_COUNT_PER_DIRECTION, LANE_WIDTH
-import src.game.entities.road as road
-from src.game.entities.truck import Truck
-from src.game.entities.enemy import Enemy, EnemyDown
+import glfw
+import pygame
+from OpenGL.GL import *
+from OpenGL.GLUT import *
+from OpenGL.GLUT import GLUT_BITMAP_HELVETICA_18
+
 import src.game.entities.police as police
-from src.game.entities.hole import Hole
-from src.game.entities.oil_stain import OilStain
+import src.game.entities.road as road
+import src.game.managers.audio_manager as audio_manager
 from src.game.entities.beer_collectible import BeerCollectible
-from src.utils.collision_utils import check_rect_collision
+from src.game.entities.enemy import Enemy, EnemyDown
+from src.game.entities.hole import Hole
 from src.game.entities.invulnerability import InvulnerabilityPowerUp
-from src.game.entities.slowmotion import SlowMotionPowerUp, SlowMotionEffect
-from src.ui.score_indicator import ScoreIndicator
-from src.utils.texture_loader import load_texture
-from src.ui.menu import MenuState, draw_start_menu, draw_instructions_screen, draw_game_over_menu, draw_name_input_screen, draw_lives, draw_pause_menu
+from src.game.entities.oil_stain import OilStain
+from src.game.entities.road import SCREEN_WIDTH, SCREEN_HEIGHT, GAME_WIDTH, PANEL_WIDTH, COLOR_PANEL, \
+    PLAYER_SPEED, \
+    LANE_COUNT_PER_DIRECTION
+from src.game.entities.slowmotion import SlowMotionEffect, SlowMotionPowerUp
+from src.game.entities.truck import Truck
 from src.game.managers.difficulty_manager import DifficultyManager
 from src.game.managers.high_score_manager import HighScoreManager
-import src.game.managers.audio_manager as audio_manager
+from src.game.managers.lane_manager import get_safe_lanes_for_obstacles, get_safe_lane_for_powerup
+from src.game.managers.viewport_manager import setup_menu_viewport_and_convert_mouse, setup_panel_viewport
+from src.graphics.renderer import draw_game_elements, draw_panel_stats, draw_text
+from src.ui.menu import MenuState, draw_start_menu, draw_instructions_screen, draw_game_over_menu, \
+    draw_name_input_screen, draw_pause_menu
+from src.ui.score_indicator import ScoreIndicator
+from src.utils.texture_loader import load_texture
 
 # --- Estados do Jogo ---
 GAME_STATE_MENU = 0
@@ -320,52 +322,51 @@ def reset_game():
     glfw.set_time(0) # Reseta o tempo
 
 
-def draw_text(text, x, y):
-    glDisable(GL_TEXTURE_2D)
-    glColor3f(1.0, 1.0, 1.0)
-    glRasterPos2f(x, y)
-    for character in text:
-        glutBitmapCharacter(GLUT_BITMAP_HELVETICA_18, ord(character))
+
 
 def draw_heart(x, y, size=8, color=(1.0, 0.3, 0.3), filled=True):
     """Desenha um coração usando primitivas geométricas do OpenGL"""
     glDisable(GL_TEXTURE_2D)
     glColor3f(color[0], color[1], color[2])
-    
+
     import math
-    
+
     if filled:
         # Coração preenchido usando uma abordagem mais precisa
         glBegin(GL_TRIANGLE_FAN)
         glVertex2f(x, y)  # Centro
-        
+
         # Criar pontos do coração usando a equação paramétrica
         for i in range(37):  # 36 pontos + volta ao início
             t = i * 2 * math.pi / 36
             # Equação paramétrica do coração
-            heart_x = x + size * (16 * math.sin(t)**3) / 16
-            heart_y = y + size * (13 * math.cos(t) - 5 * math.cos(2*t) - 2 * math.cos(3*t) - math.cos(4*t)) / 13
+            heart_x, heart_y = calculate_heart_point(t, x, y, size)
             glVertex2f(heart_x, heart_y)
-        
+
         glEnd()
     else:
         # Coração vazado (apenas contorno)
         glLineWidth(2.0)
         glBegin(GL_LINE_LOOP)
-        
+
         # Criar pontos do contorno do coração
         for i in range(36):
             t = i * 2 * math.pi / 36
             # Equação paramétrica do coração
-            heart_x = x + size * (16 * math.sin(t)**3) / 16
-            heart_y = y + size * (13 * math.cos(t) - 5 * math.cos(2*t) - 2 * math.cos(3*t) - math.cos(4*t)) / 13
+            heart_x, heart_y = calculate_heart_point(t, x, y, size)
             glVertex2f(heart_x, heart_y)
-        
+
         glEnd()
         glLineWidth(1.0)
 
+
+def calculate_heart_point(t, x, y, size):
+    heart_x = x + size * (16 * math.sin(t) ** 3) / 16
+    heart_y = y + size * (13 * math.cos(t) - 5 * math.cos(2 * t) - 2 * math.cos(3 * t) - math.cos(4 * t)) / 13
+    return heart_x, heart_y
+
 def main():
-    global current_game_state, scroll_pos, player_truck, enemies_up, enemies_down, spawn_timer_up, spawn_timer_down, police_car, holes, hole_spawn_timer, oil_stains, oil_stain_spawn_timer, beer_collectibles, beer_spawn_timer, invulnerability_powerups, invulnerability_spawn_timer, score_indicators, pending_score_bonus, beer_bonus_points, sys, random, last_police_spawn_time, current_scale, current_offset, fb_height
+    global current_game_state, scroll_pos, player_truck, enemies_up, enemies_down, spawn_timer_up, spawn_timer_down, police_car, holes, hole_spawn_timer, oil_stains, oil_stain_spawn_timer, beer_collectibles, beer_spawn_timer, invulnerability_powerups, invulnerability_spawn_timer, score_indicators, pending_score_bonus, beer_bonus_points, sys, last_police_spawn_time, current_scale, current_offset, fb_height, asking_for_name, new_high_score
 
     if not glfw.init():
         sys.exit("Could not initialize GLFW.")
@@ -437,7 +438,7 @@ def main():
         print(f"Erro ao pré-carregar áudios: {e}")
     
     if not all([truck_texture, truck_dead_texture, truck_armored_texture, truck_hole_texture, truck_oil_texture, truck_hole_and_oil_texture, 
-                hole_texture, oil_texture, beer_texture, invulnerability_texture, slowmotion_texture] + 
+                hole_texture, oil_texture, beer_texture, invulnerability_texture, slowmotion_texture] +
                enemy_textures_up + enemy_textures_down + enemy_dead_textures_up + enemy_dead_textures_down + 
                list(police_textures.values())):
         glfw.terminate()
@@ -473,31 +474,31 @@ def main():
         fb_height = fb_size[1]
 
         # Base logical resolution (use existing imported GAME_WIDTH / PANEL_WIDTH / SCREEN_HEIGHT as reference)
-        BASE_GAME_WIDTH = GAME_WIDTH
-        BASE_PANEL_WIDTH = PANEL_WIDTH
-        BASE_TOTAL_WIDTH = BASE_GAME_WIDTH + BASE_PANEL_WIDTH
-        BASE_HEIGHT = SCREEN_HEIGHT
+        base_game_width = GAME_WIDTH
+        base_panel_width = PANEL_WIDTH
+        base_total_width = base_game_width + base_panel_width
+        base_height = SCREEN_HEIGHT
 
         # Scale uniformly to fit framebuffer while preserving aspect ratio
-        scale = min(fb_width / float(BASE_TOTAL_WIDTH), fb_height / float(BASE_HEIGHT)) if BASE_TOTAL_WIDTH > 0 and BASE_HEIGHT > 0 else 1.0
+        scale = min(fb_width / float(base_total_width), fb_height / float(base_height)) if base_total_width > 0 and base_height > 0 else 1.0
         # Prevent zero or negative scale (can happen when framebuffer width/height is 0 e.g. minimized window)
         if not scale or scale <= 0.0:
             scale = 1e-6
-        scaled_width = BASE_TOTAL_WIDTH * scale
-        scaled_height = BASE_HEIGHT * scale
+        scaled_width = base_total_width * scale
+        scaled_height = base_height * scale
         offset_x = (fb_width - scaled_width) / 2.0
         offset_y = (fb_height - scaled_height) / 2.0
 
         # Integer viewports
         content_vp = (int(round(offset_x)), int(round(offset_y)), int(round(scaled_width)), int(round(scaled_height)))
-        game_vp = (int(round(offset_x)), int(round(offset_y)), int(round(BASE_GAME_WIDTH * scale)), int(round(scaled_height)))
-        panel_vp = (int(round(offset_x + BASE_GAME_WIDTH * scale)), int(round(offset_y)), int(round(BASE_PANEL_WIDTH * scale)), int(round(scaled_height)))
+        game_vp = (int(round(offset_x)), int(round(offset_y)), int(round(base_game_width * scale)), int(round(scaled_height)))
+        panel_vp = (int(round(offset_x + base_game_width * scale)), int(round(offset_y)), int(round(base_panel_width * scale)), int(round(scaled_height)))
 
         # Make road module use logical base coords for layout calculations (keeps helper functions consistent)
-        road.SCREEN_WIDTH = BASE_TOTAL_WIDTH
-        road.SCREEN_HEIGHT = BASE_HEIGHT
-        road.GAME_WIDTH = BASE_GAME_WIDTH
-        road.PANEL_WIDTH = BASE_PANEL_WIDTH
+        road.SCREEN_WIDTH = base_total_width
+        road.SCREEN_HEIGHT = base_height
+        road.GAME_WIDTH = base_game_width
+        road.PANEL_WIDTH = base_panel_width
 
         # Expose values for mouse mapping and other draw code
         current_scale = scale
@@ -514,11 +515,11 @@ def main():
             current_scroll_speed = difficulty_manager.get_current_scroll_speed()
             current_spawn_rate = difficulty_manager.get_current_spawn_rate()
             enemy_speed_multiplier = difficulty_manager.get_current_enemy_speed_multiplier()
-            
+
             # Atualizar o efeito de slow motion
             slowmotion_effect.update(time_elapsed)
             slowmotion_multiplier = slowmotion_effect.get_speed_multiplier()
-            
+
             # Aplica o multiplicador de slow motion aos valores de dificuldade
             # Mas mantém velocidades separadas para player e mundo
             world_scroll_speed = current_scroll_speed * slowmotion_multiplier
@@ -528,10 +529,10 @@ def main():
             # Aplica ao scroll_speed global (sinal negativo) - usado para o mundo
             global scroll_speed
             scroll_speed = -world_scroll_speed
-            
+
             # Velocidade da estrada afetada pelo slow motion (para sincronizar com os inimigos)
             road_scroll_speed = -world_scroll_speed
-            # Velocidade normal do player (não afetada pelo slow motion)  
+            # Velocidade normal do player (não afetada pelo slow motion)
             player_scroll_speed = -current_scroll_speed
 
             if not player_truck.crashed:
@@ -539,7 +540,7 @@ def main():
                 player_truck.update()
                 
                 dx, dy = 0.0, 0.0
-                DEADZONE = 0.3  # Zona morta para o analógico
+                deadzone = 0.3  # Zona morta para o analógico
 
                 # --- Controle do Joystick ---
                 if joystick:
@@ -547,12 +548,12 @@ def main():
 
                     # Eixo X (esquerda/direita) do analógico esquerdo
                     axis_x = joystick.get_axis(0)
-                    if abs(axis_x) > DEADZONE:
+                    if abs(axis_x) > deadzone:
                         dx = axis_x * 0.1
 
                     # Eixo Y (cima/baixo) do analógico esquerdo
                     axis_y = joystick.get_axis(1)
-                    if abs(axis_y) > DEADZONE:
+                    if abs(axis_y) > deadzone:
                         # Pygame considera -1 para cima, então invertemos
                         if axis_y < 0:  # Para cima
                             dy = 0.1
@@ -770,17 +771,8 @@ def main():
                 hole_spawn_timer = 0
                 # Agora usamos apenas a probabilidade para determinar o spawn
                 if random.random() < current_hole_probability:
-                    # Pode aparecer em qualquer faixa
-                    all_lanes = range(0, LANE_COUNT_PER_DIRECTION * 2)
-                    # Relaxamos a restrição de segurança para permitir mais buracos
-                    safe_lanes = [lane for lane in all_lanes if 
-                                  max((h.y for h in holes if h.lane_index == lane), default=0) < SCREEN_HEIGHT - safety_distance/2]
-                    
-                    # Se não houver faixas seguras, usa todas as faixas
-                    if not safe_lanes:
-                        safe_lanes = all_lanes
-                        
-                    # Tenta encontrar uma lane onde o buraco não colida com manchas de óleo existentes
+                    safe_lanes, all_lanes = get_safe_lanes_for_obstacles(oil_stains, LANE_COUNT_PER_DIRECTION,
+                                                                         SCREEN_HEIGHT, safety_distance)
                     collision_free_lanes = []
                     for lane in safe_lanes:
                         # Cria um buraco temporário para verificar colisões
@@ -837,16 +829,8 @@ def main():
                 # Agora usamos apenas a probabilidade para determinar o spawn
                 if random.random() < current_oil_stain_probability:
                     # Pode aparecer em qualquer faixa
-                    all_lanes = range(0, LANE_COUNT_PER_DIRECTION * 2)
-                    # Relaxamos a restrição de segurança para permitir mais manchas
-                    safe_lanes = [lane for lane in all_lanes if 
-                                  max((o.y for o in oil_stains if o.lane_index == lane), default=0) < SCREEN_HEIGHT - safety_distance/2]
-                    
-                    # Se não houver faixas seguras, usa todas as faixas
-                    if not safe_lanes:
-                        safe_lanes = all_lanes
-                        
-                    # Tenta encontrar uma lane onde a mancha não colida com buracos existentes
+                    safe_lanes, all_lanes = get_safe_lanes_for_obstacles(oil_stains, LANE_COUNT_PER_DIRECTION,
+                                                                         SCREEN_HEIGHT, safety_distance)
                     collision_free_lanes = []
                     for lane in safe_lanes:
                         # Cria uma mancha temporária para verificar colisões
@@ -904,16 +888,7 @@ def main():
                 
                 if random.random() < current_beer_probability:
                     # Pode aparecer em qualquer faixa
-                    all_lanes = range(0, LANE_COUNT_PER_DIRECTION * 2)
-                    # Verifica faixas seguras para não sobrecarregar
-                    safe_lanes = [lane for lane in all_lanes if 
-                                  max((b.y for b in beer_collectibles if b.lane_index == lane), default=0) < SCREEN_HEIGHT - safety_distance]
-                    
-                    # Se não houver faixas seguras, usa todas as faixas
-                    if not safe_lanes:
-                        safe_lanes = all_lanes
-                        
-                    chosen_lane = random.choice(safe_lanes)
+                    chosen_lane = get_safe_lane_for_powerup(invulnerability_powerups, LANE_COUNT_PER_DIRECTION, SCREEN_HEIGHT, safety_distance)
                     beer_collectibles.append(BeerCollectible(beer_texture, lane_index=chosen_lane, speed_multiplier=enemy_speed_multiplier))
             
             # --- Beer Collectible Update & Collision ---
@@ -982,16 +957,8 @@ def main():
                 
                 if force_spawn or random.random() < current_invulnerability_probability:
                     # Pode aparecer em qualquer faixa
-                    all_lanes = range(0, LANE_COUNT_PER_DIRECTION * 2)
-                    # Verifica se há faixas seguras (sem outros power-ups muito próximos)
-                    safe_lanes = [lane for lane in all_lanes if 
-                                  max((p.y for p in invulnerability_powerups if p.lane_index == lane), default=0) < SCREEN_HEIGHT - safety_distance]
-                    
-                    # Se não houver faixas seguras, usa todas as faixas
-                    if not safe_lanes:
-                        safe_lanes = all_lanes
-                        
-                    chosen_lane = random.choice(safe_lanes)
+                    chosen_lane = get_safe_lane_for_powerup(invulnerability_powerups, LANE_COUNT_PER_DIRECTION,
+                                                            SCREEN_HEIGHT, safety_distance)
                     invulnerability_powerups.append(InvulnerabilityPowerUp(invulnerability_texture, lane_index=chosen_lane, speed_multiplier=enemy_speed_multiplier))
             
             # --- Invulnerability Power-Up Update & Collision ---
@@ -1020,37 +987,37 @@ def main():
                 slowmotion_spawn_timer += 0.2 * CRASH_SCROLL_MULTIPLIER  # Acelerado
             else:
                 slowmotion_spawn_timer += 0.2  # Incrementa o timer para spawn (mais lento)
-                
+
             slowmotion_spawn_rate = current_spawn_rate * 2.5  # Taxa de spawn ainda mais lenta que invulnerabilidade
             current_slowmotion_probability = difficulty_manager.get_current_slowmotion_spawn_probability()
-            
+
             if slowmotion_spawn_timer >= slowmotion_spawn_rate:
                 slowmotion_spawn_timer = 0
                 # Verificação de probabilidade (com probabilidade garantida a cada X tentativas)
                 static_spawn_counter = getattr(difficulty_manager, 'slowmotion_spawn_counter', 0) + 1
                 difficulty_manager.slowmotion_spawn_counter = static_spawn_counter
-                
+
                 # Força o spawn a cada 3 tentativas, independente da probabilidade (mais frequente para testes)
                 force_spawn = (static_spawn_counter >= 3)
                 if force_spawn:
                     difficulty_manager.slowmotion_spawn_counter = 0
                     print(f"Force spawning slow motion power-up (attempt {static_spawn_counter})")
-                
+
                 if force_spawn or random.random() < current_slowmotion_probability:
                     # Pode aparecer em qualquer faixa
                     all_lanes = range(0, LANE_COUNT_PER_DIRECTION * 2)
                     # Verifica se há faixas seguras (sem outros power-ups muito próximos)
-                    safe_lanes = [lane for lane in all_lanes if 
+                    safe_lanes = [lane for lane in all_lanes if
                                   max((p.y for p in slowmotion_powerups if p.lane_index == lane), default=0) < SCREEN_HEIGHT - safety_distance]
-                    
+
                     # Se não houver faixas seguras, usa todas as faixas
                     if not safe_lanes:
                         safe_lanes = all_lanes
-                        
+
                     chosen_lane = random.choice(safe_lanes)
                     slowmotion_powerups.append(SlowMotionPowerUp(slowmotion_texture, lane_index=chosen_lane, speed_multiplier=enemy_speed_multiplier))
                     print(f"Slow motion power-up spawned at lane {chosen_lane}!")
-            
+
             # --- Slow Motion Power-Up Update & Collision ---
             for powerup in slowmotion_powerups:
                 # Usa velocidade acelerada durante crash para manter todos objetos em sincronia
@@ -1058,21 +1025,21 @@ def main():
                     powerup.update(scroll_speed * CRASH_SCROLL_MULTIPLIER)
                 else:
                     powerup.update(scroll_speed)  # Passa a velocidade atual de rolagem
-                
+
                 if powerup.active and not slowmotion_effect.is_active():  # Só pode coletar se não há slow motion ativo
                     if player_truck.check_slowmotion_powerup_collision(powerup):
                         # Power-up desaparece após uso
                         powerup.active = False
-                        
+
                         # Ativa o efeito de slow motion
                         slowmotion_effect.activate(time_elapsed)
-                        
+
                         # Toca som (pode usar o mesmo da invulnerabilidade ou criar um novo)
                         try:
                             audio_manager.play_one_shot("assets/sound/invulnerability.wav", volume=0.8)
                         except Exception as e:
                             print(f"Erro ao tocar som de slow motion: {e}")
-            
+
             # Remove power-ups que saíram da tela ou foram usados
             slowmotion_powerups = [p for p in slowmotion_powerups if p.active and p.y > -p.height]
 
@@ -1104,20 +1071,9 @@ def main():
 
         if current_game_state == GAME_STATE_MENU or current_game_state == GAME_STATE_GAME_OVER:
             # --- Scaled viewport for Menu / Game Over (preserve aspect ratio) ---
-            glViewport(content_vp[0], content_vp[1], content_vp[2], content_vp[3])
-            glMatrixMode(GL_PROJECTION)
-            glLoadIdentity()
-            gluOrtho2D(0, BASE_TOTAL_WIDTH, 0, BASE_HEIGHT)
-            glMatrixMode(GL_MODELVIEW)
-            glLoadIdentity()
 
-            # Convert mouse pixel coords -> logical base coordinates
-            mouse_px, mouse_py = glfw.get_cursor_pos(window)
-            inv_mouse_py = fb_height - mouse_py
-            # Use a safe_scale to avoid division by zero when framebuffer dimensions are zero
-            safe_scale = scale if scale and scale > 0.0 else 1e-6
-            mouse_x = (mouse_px - offset_x) / safe_scale
-            mouse_y = (inv_mouse_py - offset_y) / safe_scale
+            mouse_x, mouse_y = setup_menu_viewport_and_convert_mouse(content_vp, base_total_width, base_height,
+                                                                     fb_height, offset_x, offset_y, scale, window)
 
             if current_game_state == GAME_STATE_MENU:
                 if menu_state.active_menu == "main":
@@ -1141,54 +1097,16 @@ def main():
 
         elif current_game_state == GAME_STATE_PLAYING:
             # --- Game Viewport (scaled) ---
-            glViewport(game_vp[0], game_vp[1], game_vp[2], game_vp[3])
-            glMatrixMode(GL_PROJECTION)
-            glLoadIdentity()
-            gluOrtho2D(0, BASE_GAME_WIDTH, 0, BASE_HEIGHT)
-            glMatrixMode(GL_MODELVIEW)
-            glLoadIdentity()
-
-            draw_road(scroll_pos)
-
-            # Desenha os buracos e manchas primeiro (para ficarem "abaixo" dos carros)
-            for hole in holes:
-                hole.draw()
-
-            # Desenha as manchas de óleo
-            for oil_stain in oil_stains:
-                oil_stain.draw()
-
-            # Desenha as cervejas colecionáveis
-            for beer in beer_collectibles:
-                beer.draw()
-
-            # Desenha os indicadores de pontos
-            for indicator in score_indicators:
-                indicator.draw()
-
-            # Desenha os power-ups de invulnerabilidade
-            for powerup in invulnerability_powerups:
-                powerup.draw()
-            
-            # Desenha os power-ups de slow motion
-            for powerup in slowmotion_powerups:
-                powerup.draw()
-
-            player_truck.draw()
-            for enemy in enemies_up:
-                enemy.draw()
-            for enemy in enemies_down:
-                enemy.draw()
-
-            # Desenha o carro da polícia se ele existir
-            if police_car:
-                police_car.draw()
+            # Usar a mesma função para desenhar os elementos do jogo na tela de pausa
+            draw_game_elements(game_vp, base_game_width, base_height, scroll_pos, holes, oil_stains, beer_collectibles,
+                               score_indicators, invulnerability_powerups, player_truck, enemies_up, enemies_down,
+                               police_car, slowmotion_powerups)
 
             # --- Debug: Desenha hitboxes se ativado ---
             if DEBUG_SHOW_HITBOXES:
                 # Hitbox do player truck (vermelho com área de colisão verde)
                 player_truck.draw_debug_hitbox()
-                
+
                 # Hitboxes dos inimigos (azul com área de colisão amarela)
                 for enemy in enemies_up:
                     enemy.draw_debug_hitbox()
@@ -1214,41 +1132,22 @@ def main():
                 # Hitboxes dos power-ups de invulnerabilidade (verde com área de colisão verde brilhante)
                 for powerup in invulnerability_powerups:
                     powerup.draw_debug_hitbox()
-                
+
                 # Hitboxes dos power-ups de slow motion (roxo com área de colisão roxa brilhante)
                 for powerup in slowmotion_powerups:
                     powerup.draw_debug_hitbox()
 
             # --- Panel Viewport (scaled) ---
-            glViewport(panel_vp[0], panel_vp[1], panel_vp[2], panel_vp[3])
-            glMatrixMode(GL_PROJECTION)
-            glLoadIdentity()
-            gluOrtho2D(0, BASE_PANEL_WIDTH, 0, BASE_HEIGHT)
-            glMatrixMode(GL_MODELVIEW)
-            glLoadIdentity()
-
-            # Painel lateral - fundo
-            draw_rect(0, 0, PANEL_WIDTH, SCREEN_HEIGHT, COLOR_PANEL)
-            time_elapsed = glfw.get_time()
-
-            # Calcula a velocidade considerando o efeito do buraco com transição suave
-            base_speed = abs(scroll_speed * 400)
+            time_elapsed, base_speed = setup_panel_viewport(panel_vp, base_panel_width, base_height, PANEL_WIDTH,
+                                                            SCREEN_HEIGHT, COLOR_PANEL, scroll_speed)
             if player_truck.slowed_down:
                 # Usa o fator de velocidade atual que muda gradualmente
                 displayed_speed = base_speed * player_truck.current_speed_factor
             else:
                 displayed_speed = base_speed
 
-            score = abs(scroll_pos * 0.1) + beer_bonus_points
+            score, lives_x = draw_panel_stats(scroll_pos, beer_bonus_points, time_elapsed, displayed_speed, SCREEN_HEIGHT)
 
-            # Top stats
-            draw_text(f"Time: {int(time_elapsed)}", 12, SCREEN_HEIGHT - 28)
-            draw_text(f"Speed: {displayed_speed:.0f} km/h", 12, SCREEN_HEIGHT - 52)
-            draw_text(f"Score: {int(score)}", 12, SCREEN_HEIGHT - 76)
-
-            # Exibe as vidas usando corações desenhados geometricamente
-            draw_text("Lives:", 12, SCREEN_HEIGHT - 100)
-            lives_x = 80
             for i in range(player_truck.lives):
                 if player_truck.invulnerable:
                     # Pisca durante invulnerabilidade
@@ -1288,10 +1187,10 @@ def main():
             def clamp01(v):
                 return max(0.0, min(1.0, v))
 
-            ss_norm = clamp01((ss - 1.0) / max(0.0001, (max_ss - 1.0)))
-            sr_norm = clamp01((1.0 - sr) / max(0.0001, (1.0 - min_sr)))  # menor spawn_rate => maior frequência
-            es_norm = clamp01((es - 1.0) / max(0.0001, (max_es - 1.0)))
-            hs_norm = clamp01(hs / max_hs)
+            clamp01((ss - 1.0) / max(0.0001, (max_ss - 1.0)))
+            clamp01((1.0 - sr) / max(0.0001, (1.0 - min_sr)))
+            clamp01((es - 1.0) / max(0.0001, (max_es - 1.0)))
+            clamp01(hs / max_hs)
 
             # Difficulty values (labels with numeric values below) — adjusted for clarity
             label_x = 14
@@ -1323,7 +1222,7 @@ def main():
             # Oil Stain Spawn Probability
             oil_prob = difficulty_info.get("oil_stain_spawn_probability", 0.0)
             max_os = difficulty_manager.max_oil_stain_spawn_probability
-            os_norm = clamp01(oil_prob / max_os)
+            clamp01(oil_prob / max_os)
             draw_text("Óleo (F10 / F11)", label_x, y0)
             draw_text(f"{oil_prob:.2f} prob.", label_x, y0 - line_height)
             y0 -= group_spacing
@@ -1331,7 +1230,7 @@ def main():
             # Invulnerability Power-Up Spawn Probability
             inv_prob = difficulty_info.get("invulnerability_spawn_probability", 0.0)
             max_inv = difficulty_manager.max_invulnerability_spawn_probability
-            inv_norm = clamp01(inv_prob / max_inv)
+            clamp01(inv_prob / max_inv)
             draw_text("Invuln (F12 / Ins)", label_x, y0)
             draw_text(f"{inv_prob:.2f} prob.", label_x, y0 - line_height)
             y0 -= group_spacing
@@ -1339,7 +1238,7 @@ def main():
             # Beer Spawn Probability
             beer_prob = difficulty_info.get("beer_spawn_probability", 0.0)
             max_beer = difficulty_manager.max_beer_spawn_probability
-            beer_norm = clamp01(beer_prob / max_beer)
+            clamp01(beer_prob / max_beer)
             draw_text("Cerveja (B / V)", label_x, y0)
             draw_text(f"{beer_prob:.2f} prob.", label_x, y0 - line_height)
             y0 -= group_spacing
@@ -1368,47 +1267,18 @@ def main():
             # A lógica de desenho é a mesma do estado 'PLAYING', mas sem a lógica de update.
 
             # --- Game Viewport (scaled) ---
-            glViewport(game_vp[0], game_vp[1], game_vp[2], game_vp[3])
-            glMatrixMode(GL_PROJECTION)
-            glLoadIdentity()
-            gluOrtho2D(0, BASE_GAME_WIDTH, 0, BASE_HEIGHT)
-            glMatrixMode(GL_MODELVIEW)
-            glLoadIdentity()
+            draw_game_elements(game_vp, base_game_width, base_height, scroll_pos, holes, oil_stains, beer_collectibles,
+                               score_indicators, invulnerability_powerups, player_truck, enemies_up, enemies_down,
+                               police_car, slowmotion_powerups)
 
-            draw_road(scroll_pos)
 
-            for hole in holes: hole.draw()
-            for oil_stain in oil_stains: oil_stain.draw()
-            for beer in beer_collectibles: beer.draw()
-            for indicator in score_indicators: indicator.draw()
-            for powerup in invulnerability_powerups: powerup.draw()
-            for powerup in slowmotion_powerups: powerup.draw()
-
-            player_truck.draw()
-            for enemy in enemies_up: enemy.draw()
-            for enemy in enemies_down: enemy.draw()
-            if police_car: police_car.draw()
 
             # --- Panel Viewport (scaled) ---
-            glViewport(panel_vp[0], panel_vp[1], panel_vp[2], panel_vp[3])
-            glMatrixMode(GL_PROJECTION)
-            glLoadIdentity()
-            gluOrtho2D(0, BASE_PANEL_WIDTH, 0, BASE_HEIGHT)
-            glMatrixMode(GL_MODELVIEW)
-            glLoadIdentity()
+            time_elapsed, base_speed = setup_panel_viewport(panel_vp, base_panel_width, base_height, PANEL_WIDTH,
+                                                            SCREEN_HEIGHT, COLOR_PANEL, scroll_speed)
 
-            # Re-desenha o painel lateral para que ele também fique visível
-            draw_rect(0, 0, PANEL_WIDTH, SCREEN_HEIGHT, COLOR_PANEL)
-            time_elapsed = glfw.get_time()
-            base_speed = abs(scroll_speed * 400)
             displayed_speed = base_speed * player_truck.current_speed_factor if player_truck.slowed_down else base_speed
-            score = abs(scroll_pos * 0.1) + beer_bonus_points
-
-            draw_text(f"Time: {int(time_elapsed)}", 12, SCREEN_HEIGHT - 28)
-            draw_text(f"Speed: {displayed_speed:.0f} km/h", 12, SCREEN_HEIGHT - 52)
-            draw_text(f"Score: {int(score)}", 12, SCREEN_HEIGHT - 76)
-            draw_text("Lives:", 12, SCREEN_HEIGHT - 100)
-            lives_x = 80
+            score, lives_x = draw_panel_stats(scroll_pos, beer_bonus_points, time_elapsed, displayed_speed, SCREEN_HEIGHT)
             for i in range(player_truck.lives):
                 draw_heart(lives_x + i * 25, SCREEN_HEIGHT - 95, size=10, color=(1.0, 0.3, 0.3), filled=True)
             for i in range(player_truck.lives, 3):
@@ -1417,25 +1287,17 @@ def main():
 
             # --- 2. DESENHA O MENU DE PAUSA POR CIMA ---
             # Configura a viewport para cobrir toda a área de conteúdo
-            glViewport(content_vp[0], content_vp[1], content_vp[2], content_vp[3])
-            glMatrixMode(GL_PROJECTION)
-            glLoadIdentity()
-            gluOrtho2D(0, BASE_TOTAL_WIDTH, 0, BASE_HEIGHT)
-            glMatrixMode(GL_MODELVIEW)
-            glLoadIdentity()
-
-            # Converte as coordenadas do mouse para o sistema lógico do menu
-            mouse_px, mouse_py = glfw.get_cursor_pos(window)
-            inv_mouse_py = fb_height - mouse_py
-            safe_scale = scale if scale and scale > 0.0 else 1e-6
-            mouse_x = (mouse_px - offset_x) / safe_scale
-            mouse_y = (inv_mouse_py - offset_y) / safe_scale
+            mouse_x, mouse_y = setup_menu_viewport_and_convert_mouse(content_vp, base_total_width, base_height,
+                                                                     fb_height, offset_x, offset_y, scale, window)
 
             draw_pause_menu(menu_state, mouse_x, mouse_y)
 
         glfw.swap_buffers(window)
 
     glfw.terminate()
+
+
+
 
 if __name__ == "__main__":
     main()

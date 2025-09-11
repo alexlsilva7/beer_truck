@@ -1,4 +1,3 @@
-# Ficheiro: difficulty_manager.py
 # Gerenciador de progressão de dificuldade do jogo
 
 class DifficultyManager:
