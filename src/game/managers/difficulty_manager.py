@@ -10,6 +10,7 @@ class DifficultyManager:
         self.base_oil_stain_spawn_probability = 0.35  # Aumentado para compensar a remoção do spawn forçado
         self.base_invulnerability_spawn_probability = 0.3  # Aumentado para 30% para facilitar testes
         self.base_beer_spawn_probability = 0.3  # 30% de chance inicial para cerveja
+        self.base_slowmotion_spawn_probability = 0.5  # 50% de chance inicial para slow motion (temporário para teste)
 
         # Multiplicadores atuais (iniciam em 1.0 = 100%)
         self.scroll_speed_multiplier = 1.0
@@ -19,6 +20,7 @@ class DifficultyManager:
         self.oil_stain_spawn_probability = self.base_oil_stain_spawn_probability
         self.invulnerability_spawn_probability = self.base_invulnerability_spawn_probability
         self.beer_spawn_probability = self.base_beer_spawn_probability
+        self.slowmotion_spawn_probability = self.base_slowmotion_spawn_probability
 
         # Taxas de aumento por segundo
         self.scroll_speed_increase_rate = 0.002
@@ -27,6 +29,7 @@ class DifficultyManager:
         self.hole_spawn_increase_rate = 0.00006  # Reduzido para progressão mais lenta
         self.oil_stain_spawn_increase_rate = 0.00006  # Reduzido para progressão mais lenta
         self.invulnerability_spawn_increase_rate = 0.0001  # Aumento gradual da chance de power-ups
+        self.slowmotion_spawn_increase_rate = 0.00008  # Aumento gradual da chance de slow motion
 
         # Limites máximos para evitar valores extremos
         self.max_scroll_speed_multiplier = 2.0
@@ -36,10 +39,15 @@ class DifficultyManager:
         self.max_oil_stain_spawn_probability = 0.4  # Máximo de 40% de chance
         self.max_invulnerability_spawn_probability = 0.8  # Aumentado para 80% para facilitar testes
         self.max_beer_spawn_probability = 0.8  # Máximo de 80% de chance, igual à invulnerabilidade
+        self.max_slowmotion_spawn_probability = 0.5  # Máximo de 50% de chance para slow motion
 
         # Controles para ajustes manuais
         self.manual_control_enabled = False
         self.last_update_time = 0
+        
+        # Contadores para spawn forçado
+        self.invulnerability_spawn_counter = 0
+        self.slowmotion_spawn_counter = 0
 
     def update(self, current_time, score):
         """
@@ -89,6 +97,12 @@ class DifficultyManager:
                 self.invulnerability_spawn_probability + (self.invulnerability_spawn_increase_rate * delta_time),
                 self.max_invulnerability_spawn_probability
             )
+            
+            # Atualiza a probabilidade de spawn de power-ups de slow motion
+            self.slowmotion_spawn_probability = min(
+                self.slowmotion_spawn_probability + (self.slowmotion_spawn_increase_rate * delta_time),
+                self.max_slowmotion_spawn_probability
+            )
 
     def get_current_scroll_speed(self):
         """Retorna a velocidade de rolagem atual"""
@@ -113,6 +127,10 @@ class DifficultyManager:
     def get_current_invulnerability_spawn_probability(self):
         """Retorna a probabilidade atual de spawn de power-ups de invulnerabilidade"""
         return self.invulnerability_spawn_probability
+    
+    def get_current_slowmotion_spawn_probability(self):
+        """Retorna a probabilidade atual de spawn de power-ups de slow motion"""
+        return self.slowmotion_spawn_probability
 
     def adjust_scroll_speed_multiplier(self, delta):
         """Ajusta manualmente o multiplicador de velocidade de rolagem"""
@@ -161,6 +179,14 @@ class DifficultyManager:
                 self.invulnerability_spawn_probability + delta,
                 self.max_invulnerability_spawn_probability
             ))
+    
+    def adjust_slowmotion_spawn_probability(self, delta):
+        """Ajusta manualmente a probabilidade de spawn de power-ups de slow motion"""
+        if self.manual_control_enabled:
+            self.slowmotion_spawn_probability = max(0.0, min(
+                self.slowmotion_spawn_probability + delta,
+                self.max_slowmotion_spawn_probability
+            ))
 
     def reset(self):
         """Reseta todos os multiplicadores para os valores iniciais"""
@@ -171,7 +197,9 @@ class DifficultyManager:
         self.oil_stain_spawn_probability = self.base_oil_stain_spawn_probability
         self.invulnerability_spawn_probability = self.base_invulnerability_spawn_probability
         self.beer_spawn_probability = self.base_beer_spawn_probability
+        self.slowmotion_spawn_probability = self.base_slowmotion_spawn_probability
         self.invulnerability_spawn_counter = 0
+        self.slowmotion_spawn_counter = 0
         self.last_update_time = 0
 
     def toggle_manual_control(self):
@@ -200,6 +228,7 @@ class DifficultyManager:
             "oil_stain_spawn_probability": self.oil_stain_spawn_probability,
             "invulnerability_spawn_probability": self.invulnerability_spawn_probability,
             "beer_spawn_probability": self.beer_spawn_probability,
+            "slowmotion_spawn_probability": self.slowmotion_spawn_probability,
             "current_scroll_speed": self.get_current_scroll_speed(),
             "current_spawn_rate": self.get_current_spawn_rate(),
             "manual_control": self.manual_control_enabled

@@ -7,7 +7,7 @@ from src.game.entities.road import draw_road
 
 
 def draw_game_elements(game_vp, base_game_width, base_height, e_scroll_pos, e_holes, e_oil_stains, e_beer_collectibles,
-                       e_score_indicators, e_invulnerability_powerups, e_player_truck, e_enemies_up, e_enemies_down, e_police_car):
+                       e_score_indicators, e_invulnerability_powerups, e_player_truck, e_enemies_up, e_enemies_down, e_police_car, e_slowmotion_powerups):
     # Configuração da viewport e projeção
     glViewport(game_vp[0], game_vp[1], game_vp[2], game_vp[3])
     glMatrixMode(GL_PROJECTION)
@@ -36,6 +36,10 @@ def draw_game_elements(game_vp, base_game_width, base_height, e_scroll_pos, e_ho
 
     # Desenha os power-ups de invulnerabilidade
     for powerup in e_invulnerability_powerups:
+        powerup.draw()
+
+    # Desenha os power-ups de slow motion
+    for powerup in e_slowmotion_powerups:
         powerup.draw()
 
     e_player_truck.draw()
