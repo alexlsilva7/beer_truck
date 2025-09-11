@@ -2,6 +2,7 @@
 from OpenGL.GL import *
 import random
 from src.game.entities.road import ROAD_WIDTH, GAME_WIDTH, SCREEN_HEIGHT, LANE_WIDTH, LANE_COUNT_PER_DIRECTION, PLAYER_SPEED
+from src.utils.debug_utils import draw_hitbox, draw_collision_area, draw_real_hitbox
 
 
 class Enemy:
@@ -81,6 +82,23 @@ class Enemy:
         glColor4f(1.0, 1.0, 1.0, 1.0)
         glDisable(GL_TEXTURE_2D)
         glDisable(GL_BLEND)
+
+    def draw_debug_hitbox(self, show_collision_area=True):
+        """Desenha a hitbox de debug para visualização."""
+        # Desenha o retângulo completo do sprite (azul para inimigos)
+        draw_hitbox(self.x, self.y, self.width, self.height, 
+                   color=(0.0, 0.0, 1.0, 0.8), line_width=2)
+        
+        if show_collision_area:
+            # Calcula a hitbox REAL que é usada para colisão (igual ao truck)
+            enemy_hitbox_width = self.width / 1.3
+            enemy_hitbox_height = self.height / 1.05
+            enemy_hitbox_x = self.x + (self.width - enemy_hitbox_width) / 2
+            enemy_hitbox_y = self.y + (self.height - enemy_hitbox_height) / 2
+            
+            # Desenha a hitbox REAL de colisão (magenta para inimigos)
+            draw_real_hitbox(enemy_hitbox_x, enemy_hitbox_y, enemy_hitbox_width, enemy_hitbox_height,
+                           color=(1.0, 0.0, 1.0, 1.0))
 
 
 class EnemyDown(Enemy):

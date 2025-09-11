@@ -3,6 +3,7 @@ from OpenGL.GL import *
 import random
 from src.game.entities.road import ROAD_WIDTH, GAME_WIDTH, SCREEN_HEIGHT, LANE_WIDTH, LANE_COUNT_PER_DIRECTION, PLAYER_SPEED
 from src.utils.collision_utils import check_rect_collision
+from src.utils.debug_utils import draw_hitbox, draw_real_hitbox
 
 
 class OilStain:
@@ -84,3 +85,23 @@ class OilStain:
             self.x, self.y, self.width, self.height,
             obj.x, obj.y, obj.width, obj.height
         )
+
+    def draw_debug_hitbox(self, show_collision_area=True):
+        """Desenha a hitbox de debug para visualização."""
+        if not self.active:
+            return
+            
+        # Desenha o retângulo completo do sprite (roxo para óleo)
+        draw_hitbox(self.x, self.y, self.width, self.height, 
+                   color=(0.5, 0.0, 0.5, 0.8), line_width=2)
+        
+        if show_collision_area:
+            # Para óleo, usa uma hitbox ligeiramente menor
+            oil_hitbox_width = self.width / 1.2  # ← VOCÊ PODE ALTERAR AQUI
+            oil_hitbox_height = self.height / 1.2  # ← VOCÊ PODE ALTERAR AQUI
+            oil_hitbox_x = self.x + (self.width - oil_hitbox_width) / 2
+            oil_hitbox_y = self.y + (self.height - oil_hitbox_height) / 2
+            
+            # Desenha a hitbox REAL de colisão (roxo brilhante para óleo)
+            draw_real_hitbox(oil_hitbox_x, oil_hitbox_y, oil_hitbox_width, oil_hitbox_height,
+                           color=(1.0, 0.0, 1.0, 1.0))
