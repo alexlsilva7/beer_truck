@@ -518,6 +518,12 @@ def main():
 
             # Atualizar o efeito de slow motion
             slowmotion_effect.update(time_elapsed)
+            
+            if not player_truck.crashed:
+                # Atualiza o estado do caminhão (verifica invulnerabilidade)
+                player_truck.update()
+            
+            # Calcula o multiplicador ANTES de processar as colisões
             slowmotion_multiplier = slowmotion_effect.get_speed_multiplier()
 
             # Aplica o multiplicador de slow motion aos valores de dificuldade
@@ -536,8 +542,6 @@ def main():
             player_scroll_speed = -current_scroll_speed
 
             if not player_truck.crashed:
-                # Atualiza o estado do caminhão (verifica invulnerabilidade)
-                player_truck.update()
                 
                 dx, dy = 0.0, 0.0
                 deadzone = 0.3  # Zona morta para o analógico
@@ -607,8 +611,14 @@ def main():
                     if not remaining_crashed_visible:
                         # Se ainda tem vidas, faz o respawn
                         if player_truck.lives > 0:
+                            # Desativa slow motion antes do respawn
+                            if slowmotion_effect.is_active():
+                                slowmotion_effect.deactivate()
                             player_truck.respawn()
                         else:
+                            # Desativa slow motion antes do game over
+                            if slowmotion_effect.is_active():
+                                slowmotion_effect.deactivate()
                             # Se não tem mais vidas, é Game Over
                             current_game_state = GAME_STATE_GAME_OVER
                             # Para a música de fundo ao entrar na tela de game over
@@ -756,6 +766,21 @@ def main():
                         enemy.y += scroll_speed * CRASH_SCROLL_MULTIPLIER
                     else:
                         enemy.y += scroll_speed
+            
+            # --- Verifica se o player crashou durante o slow motion e desativa o efeito ---
+            if player_truck.crashed and slowmotion_effect.is_active():
+                slowmotion_effect.deactivate()
+                print("Slow motion desativado devido ao crash do player")
+                
+                # Recalcula as velocidades com o slow motion desativado
+                new_slowmotion_multiplier = slowmotion_effect.get_speed_multiplier()  # Será 1.0 agora
+                world_scroll_speed = current_scroll_speed * new_slowmotion_multiplier
+                current_spawn_rate = difficulty_manager.get_current_spawn_rate() / new_slowmotion_multiplier
+                enemy_speed_multiplier = difficulty_manager.get_current_enemy_speed_multiplier() * new_slowmotion_multiplier
+                
+                # Atualiza o scroll_speed global
+                scroll_speed = -world_scroll_speed
+                road_scroll_speed = -world_scroll_speed
                     
             # --- Hole Spawning ---
             # Acelera o timer de spawn quando o player está crashado
