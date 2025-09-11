@@ -1100,10 +1100,10 @@ def main():
             def clamp01(v):
                 return max(0.0, min(1.0, v))
 
-            ss_norm = clamp01((ss - 1.0) / max(0.0001, (max_ss - 1.0)))
-            sr_norm = clamp01((1.0 - sr) / max(0.0001, (1.0 - min_sr)))  # menor spawn_rate => maior frequência
-            es_norm = clamp01((es - 1.0) / max(0.0001, (max_es - 1.0)))
-            hs_norm = clamp01(hs / max_hs)
+            clamp01((ss - 1.0) / max(0.0001, (max_ss - 1.0)))
+            clamp01((1.0 - sr) / max(0.0001, (1.0 - min_sr)))
+            clamp01((es - 1.0) / max(0.0001, (max_es - 1.0)))
+            clamp01(hs / max_hs)
 
             # Difficulty values (labels with numeric values below) — adjusted for clarity
             label_x = 14
@@ -1135,7 +1135,7 @@ def main():
             # Oil Stain Spawn Probability
             oil_prob = difficulty_info.get("oil_stain_spawn_probability", 0.0)
             max_os = difficulty_manager.max_oil_stain_spawn_probability
-            os_norm = clamp01(oil_prob / max_os)
+            clamp01(oil_prob / max_os)
             draw_text("Óleo (F10 / F11)", label_x, y0)
             draw_text(f"{oil_prob:.2f} prob.", label_x, y0 - line_height)
             y0 -= group_spacing
@@ -1143,7 +1143,7 @@ def main():
             # Invulnerability Power-Up Spawn Probability
             inv_prob = difficulty_info.get("invulnerability_spawn_probability", 0.0)
             max_inv = difficulty_manager.max_invulnerability_spawn_probability
-            inv_norm = clamp01(inv_prob / max_inv)
+            clamp01(inv_prob / max_inv)
             draw_text("Invuln (F12 / Ins)", label_x, y0)
             draw_text(f"{inv_prob:.2f} prob.", label_x, y0 - line_height)
             y0 -= group_spacing
@@ -1151,7 +1151,7 @@ def main():
             # Beer Spawn Probability
             beer_prob = difficulty_info.get("beer_spawn_probability", 0.0)
             max_beer = difficulty_manager.max_beer_spawn_probability
-            beer_norm = clamp01(beer_prob / max_beer)
+            clamp01(beer_prob / max_beer)
             draw_text("Cerveja (B / V)", label_x, y0)
             draw_text(f"{beer_prob:.2f} prob.", label_x, y0 - line_height)
             y0 -= group_spacing
