@@ -7,6 +7,7 @@ import sys
 import os
 import random
 import time
+import math
 import pygame
 
 from src.game.entities.road import draw_road, SCREEN_WIDTH, SCREEN_HEIGHT, GAME_WIDTH, PANEL_WIDTH, COLOR_PANEL, draw_rect, PLAYER_SPEED, \
@@ -20,6 +21,7 @@ from src.game.entities.oil_stain import OilStain
 from src.game.entities.beer_collectible import BeerCollectible
 from src.utils.collision_utils import check_rect_collision
 from src.game.entities.invulnerability import InvulnerabilityPowerUp
+from src.game.entities.slowmotion import SlowMotionPowerUp, SlowMotionEffect
 from src.ui.score_indicator import ScoreIndicator
 from src.utils.texture_loader import load_texture
 from src.ui.menu import MenuState, draw_start_menu, draw_instructions_screen, draw_game_over_menu, draw_name_input_screen, draw_lives, draw_pause_menu
@@ -112,6 +114,9 @@ beer_collectibles = []  # Lista para armazenar os objetos de cerveja coletáveis
 beer_spawn_timer = 0  # Temporizador para spawn de cervejas
 invulnerability_powerups = []  # Lista para armazenar os power-ups de invulnerabilidade
 invulnerability_spawn_timer = 0  # Temporizador para spawn de power-ups
+slowmotion_powerups = []  # Lista para armazenar os power-ups de slow motion
+slowmotion_spawn_timer = 0  # Temporizador para spawn de power-ups de slow motion
+slowmotion_effect = SlowMotionEffect()  # Instância do efeito de slow motion
 score_indicators = []  # Lista para armazenar os indicadores de pontos
 pending_score_bonus = 0  # Pontos bônus pendentes para aplicação gradual
 beer_bonus_points = 0  # Pontos ganhos com cerveja (separado do scroll_pos)
@@ -190,6 +195,12 @@ def key_callback(window, key, scancode, action, mods):
             difficulty_manager.adjust_invulnerability_spawn_probability(0.02)
         elif key == glfw.KEY_INSERT:
             difficulty_manager.adjust_invulnerability_spawn_probability(-0.02)
+        elif key == glfw.KEY_N:
+            # Aumentar probabilidade de spawn do slow motion
+            difficulty_manager.adjust_slowmotion_spawn_probability(0.02)
+        elif key == glfw.KEY_M:
+            # Diminuir probabilidade de spawn do slow motion
+            difficulty_manager.adjust_slowmotion_spawn_probability(-0.02)
         elif key == glfw.KEY_B:
             # Diminuir probabilidade de spawn da cerveja
             difficulty_manager.adjust_beer_spawn_probability(-0.05)
@@ -266,7 +277,7 @@ def mouse_button_callback(window, button, action, mods):
                         current_game_state = GAME_STATE_PLAYING
 
 def reset_game():
-    global scroll_pos, player_truck, enemies_up, enemies_down, spawn_timer_up, spawn_timer_down, player_name, asking_for_name, new_high_score, police_car,  holes, hole_spawn_timer, oil_stains, oil_stain_spawn_timer, beer_collectibles, beer_spawn_timer, invulnerability_powerups, invulnerability_spawn_timer, score_indicators, pending_score_bonus, beer_bonus_points, last_police_spawn_time
+    global scroll_pos, player_truck, enemies_up, enemies_down, spawn_timer_up, spawn_timer_down, player_name, asking_for_name, new_high_score, police_car,  holes, hole_spawn_timer, oil_stains, oil_stain_spawn_timer, beer_collectibles, beer_spawn_timer, invulnerability_powerups, invulnerability_spawn_timer, slowmotion_powerups, slowmotion_spawn_timer, slowmotion_effect, score_indicators, pending_score_bonus, beer_bonus_points, last_police_spawn_time
     scroll_pos = 0.0
     player_truck.reset()
     enemies_up.clear()
@@ -290,6 +301,8 @@ def reset_game():
     oil_stains.clear()
     beer_collectibles.clear()
     invulnerability_powerups.clear()
+    slowmotion_powerups.clear()
+    slowmotion_effect.deactivate()
     score_indicators.clear()
     spawn_timer_up = 0
     spawn_timer_down = 0
@@ -297,6 +310,7 @@ def reset_game():
     oil_stain_spawn_timer = 0
     beer_spawn_timer = 0
     invulnerability_spawn_timer = 0
+    slowmotion_spawn_timer = 0
     pending_score_bonus = 0
     beer_bonus_points = 0
     difficulty_manager.reset()
@@ -402,6 +416,8 @@ def main():
     oil_texture = load_texture(os.path.join(script_dir, "assets/elementos_de_cenario/mancha_oleo.png"))
     beer_texture = load_texture(os.path.join(script_dir, "assets/elementos_de_cenario/cerveja.png"))
     invulnerability_texture = load_texture(os.path.join(script_dir, "assets/elementos_de_cenario/invecibilidade asset.png"))
+    slowmotion_texture = load_texture(os.path.join(script_dir, "assets/elementos_de_cenario/relogio.png"))
+    print(f"Slow motion texture loaded: {slowmotion_texture}")
 
     police_textures = {
         'normal_1': load_texture(os.path.join(script_dir, "assets/veiculos/police_1.png")),
@@ -421,7 +437,7 @@ def main():
         print(f"Erro ao pré-carregar áudios: {e}")
     
     if not all([truck_texture, truck_dead_texture, truck_armored_texture, truck_hole_texture, truck_oil_texture, truck_hole_and_oil_texture, 
-                hole_texture, oil_texture, beer_texture, invulnerability_texture] + 
+                hole_texture, oil_texture, beer_texture, invulnerability_texture, slowmotion_texture] + 
                enemy_textures_up + enemy_textures_down + enemy_dead_textures_up + enemy_dead_textures_down + 
                list(police_textures.values())):
         glfw.terminate()
@@ -434,12 +450,14 @@ def main():
     oil_stains = []
     beer_collectibles = []
     invulnerability_powerups = []
+    slowmotion_powerups = []
     score_indicators = []
     spawn_timer_up, spawn_timer_down = 0, 0
     hole_spawn_timer = 0
     oil_stain_spawn_timer = 0
     beer_spawn_timer = 0
     invulnerability_spawn_timer = 0
+    slowmotion_spawn_timer = 0
     pending_score_bonus = 0
     beer_bonus_points = 0
 
@@ -496,10 +514,25 @@ def main():
             current_scroll_speed = difficulty_manager.get_current_scroll_speed()
             current_spawn_rate = difficulty_manager.get_current_spawn_rate()
             enemy_speed_multiplier = difficulty_manager.get_current_enemy_speed_multiplier()
+            
+            # Atualizar o efeito de slow motion
+            slowmotion_effect.update(time_elapsed)
+            slowmotion_multiplier = slowmotion_effect.get_speed_multiplier()
+            
+            # Aplica o multiplicador de slow motion aos valores de dificuldade
+            # Mas mantém velocidades separadas para player e mundo
+            world_scroll_speed = current_scroll_speed * slowmotion_multiplier
+            current_spawn_rate /= slowmotion_multiplier  # Spawns mais lentos durante slow motion
+            enemy_speed_multiplier *= slowmotion_multiplier
 
-            # Aplica ao scroll_speed global (sinal negativo)
+            # Aplica ao scroll_speed global (sinal negativo) - usado para o mundo
             global scroll_speed
-            scroll_speed = -current_scroll_speed
+            scroll_speed = -world_scroll_speed
+            
+            # Velocidade da estrada afetada pelo slow motion (para sincronizar com os inimigos)
+            road_scroll_speed = -world_scroll_speed
+            # Velocidade normal do player (não afetada pelo slow motion)  
+            player_scroll_speed = -current_scroll_speed
 
             if not player_truck.crashed:
                 # Atualiza o estado do caminhão (verifica invulnerabilidade)
@@ -560,8 +593,8 @@ def main():
             else:
                 # --- LÓGICA DE CRASH / RESPAWN / GAME OVER ---
                 # Empurra o caminhão com o scroll quando está crashado
-                # MODIFICAÇÃO: Acelera a velocidade de scroll durante o período de crash
-                player_truck.y += scroll_speed * CRASH_SCROLL_MULTIPLIER
+                # MODIFICAÇÃO: Usa a velocidade normal do player, não afetada pelo slow motion
+                player_truck.y += player_scroll_speed * CRASH_SCROLL_MULTIPLIER
 
                 # Só continua para a próxima etapa (respawn ou game over) quando o caminhão saiu da tela E
                 # todos os inimigos marcados como crashados também já tiverem saído.
@@ -596,9 +629,9 @@ def main():
             
             # Acelera a rolagem do cenário quando o caminhão está crashado
             if player_truck.crashed:
-                scroll_pos += scroll_speed * CRASH_SCROLL_MULTIPLIER
+                scroll_pos += road_scroll_speed * CRASH_SCROLL_MULTIPLIER
             else:
-                scroll_pos += scroll_speed
+                scroll_pos += road_scroll_speed
 
             # --- Police Spawning ---
             if police_car is None and score > POLICE_SPAWN_SCORE_THRESHOLD:
@@ -688,7 +721,7 @@ def main():
                 if player_truck.crashed:
                     enemy.update(all_enemies, CRASH_SCROLL_MULTIPLIER)
                 else:
-                    enemy.update(all_enemies)
+                    enemy.update(all_enemies, slowmotion_multiplier)
                     
                 # Marca inimigos que colidem com o caminhão
                 if not enemy.crashed and player_truck.check_collision(enemy):
@@ -981,6 +1014,68 @@ def main():
             # Remove power-ups que saíram da tela ou foram usados
             invulnerability_powerups = [p for p in invulnerability_powerups if p.active and p.y > -p.height]
 
+            # --- Slow Motion Power-Up Spawning ---
+            # Acelera o timer durante crash
+            if player_truck.crashed:
+                slowmotion_spawn_timer += 0.2 * CRASH_SCROLL_MULTIPLIER  # Acelerado
+            else:
+                slowmotion_spawn_timer += 0.2  # Incrementa o timer para spawn (mais lento)
+                
+            slowmotion_spawn_rate = current_spawn_rate * 2.5  # Taxa de spawn ainda mais lenta que invulnerabilidade
+            current_slowmotion_probability = difficulty_manager.get_current_slowmotion_spawn_probability()
+            
+            if slowmotion_spawn_timer >= slowmotion_spawn_rate:
+                slowmotion_spawn_timer = 0
+                # Verificação de probabilidade (com probabilidade garantida a cada X tentativas)
+                static_spawn_counter = getattr(difficulty_manager, 'slowmotion_spawn_counter', 0) + 1
+                difficulty_manager.slowmotion_spawn_counter = static_spawn_counter
+                
+                # Força o spawn a cada 3 tentativas, independente da probabilidade (mais frequente para testes)
+                force_spawn = (static_spawn_counter >= 3)
+                if force_spawn:
+                    difficulty_manager.slowmotion_spawn_counter = 0
+                    print(f"Force spawning slow motion power-up (attempt {static_spawn_counter})")
+                
+                if force_spawn or random.random() < current_slowmotion_probability:
+                    # Pode aparecer em qualquer faixa
+                    all_lanes = range(0, LANE_COUNT_PER_DIRECTION * 2)
+                    # Verifica se há faixas seguras (sem outros power-ups muito próximos)
+                    safe_lanes = [lane for lane in all_lanes if 
+                                  max((p.y for p in slowmotion_powerups if p.lane_index == lane), default=0) < SCREEN_HEIGHT - safety_distance]
+                    
+                    # Se não houver faixas seguras, usa todas as faixas
+                    if not safe_lanes:
+                        safe_lanes = all_lanes
+                        
+                    chosen_lane = random.choice(safe_lanes)
+                    slowmotion_powerups.append(SlowMotionPowerUp(slowmotion_texture, lane_index=chosen_lane, speed_multiplier=enemy_speed_multiplier))
+                    print(f"Slow motion power-up spawned at lane {chosen_lane}!")
+            
+            # --- Slow Motion Power-Up Update & Collision ---
+            for powerup in slowmotion_powerups:
+                # Usa velocidade acelerada durante crash para manter todos objetos em sincronia
+                if player_truck.crashed:
+                    powerup.update(scroll_speed * CRASH_SCROLL_MULTIPLIER)
+                else:
+                    powerup.update(scroll_speed)  # Passa a velocidade atual de rolagem
+                
+                if powerup.active and not slowmotion_effect.is_active():  # Só pode coletar se não há slow motion ativo
+                    if player_truck.check_slowmotion_powerup_collision(powerup):
+                        # Power-up desaparece após uso
+                        powerup.active = False
+                        
+                        # Ativa o efeito de slow motion
+                        slowmotion_effect.activate(time_elapsed)
+                        
+                        # Toca som (pode usar o mesmo da invulnerabilidade ou criar um novo)
+                        try:
+                            audio_manager.play_one_shot("assets/sound/invulnerability.wav", volume=0.8)
+                        except Exception as e:
+                            print(f"Erro ao tocar som de slow motion: {e}")
+            
+            # Remove power-ups que saíram da tela ou foram usados
+            slowmotion_powerups = [p for p in slowmotion_powerups if p.active and p.y > -p.height]
+
             # Propagação de colisão: inimigos crashados podem colidir com outros
             def _rects_overlap(a, b):
                 return (a.x < b.x + b.width and
@@ -1074,6 +1169,10 @@ def main():
             # Desenha os power-ups de invulnerabilidade
             for powerup in invulnerability_powerups:
                 powerup.draw()
+            
+            # Desenha os power-ups de slow motion
+            for powerup in slowmotion_powerups:
+                powerup.draw()
 
             player_truck.draw()
             for enemy in enemies_up:
@@ -1114,6 +1213,10 @@ def main():
                 
                 # Hitboxes dos power-ups de invulnerabilidade (verde com área de colisão verde brilhante)
                 for powerup in invulnerability_powerups:
+                    powerup.draw_debug_hitbox()
+                
+                # Hitboxes dos power-ups de slow motion (roxo com área de colisão roxa brilhante)
+                for powerup in slowmotion_powerups:
                     powerup.draw_debug_hitbox()
 
             # --- Panel Viewport (scaled) ---
@@ -1241,6 +1344,21 @@ def main():
             draw_text(f"{beer_prob:.2f} prob.", label_x, y0 - line_height)
             y0 -= group_spacing
 
+            # Slow Motion Power-Up Spawn Probability
+            slow_prob = difficulty_info.get("slowmotion_spawn_probability", 0.0)
+            max_slow = difficulty_manager.max_slowmotion_spawn_probability
+            slow_norm = clamp01(slow_prob / max_slow)
+            draw_text("SlowMo (N / M)", label_x, y0)
+            draw_text(f"{slow_prob:.2f} prob.", label_x, y0 - line_height)
+            y0 -= group_spacing
+
+            # Slow Motion Status
+            if slowmotion_effect.is_active():
+                remaining_time = slowmotion_effect.get_remaining_time()
+                draw_text("SLOW MOTION", label_x, y0)
+                draw_text(f"{remaining_time:.1f}s", label_x, y0 - line_height)
+                y0 -= group_spacing
+
             # Mode / ajuda de teclas
             mode_text = "MODE: MANUAL (F7)" if difficulty_info['manual_control'] else "MODE: AUTO (F7)"
             draw_text(mode_text, 12, y0)
@@ -1264,6 +1382,7 @@ def main():
             for beer in beer_collectibles: beer.draw()
             for indicator in score_indicators: indicator.draw()
             for powerup in invulnerability_powerups: powerup.draw()
+            for powerup in slowmotion_powerups: powerup.draw()
 
             player_truck.draw()
             for enemy in enemies_up: enemy.draw()
