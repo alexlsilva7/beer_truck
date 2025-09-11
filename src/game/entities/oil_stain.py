@@ -1,10 +1,10 @@
-from OpenGL.GL import *
 import random
+
+from src.game.entities.base_drawable import DrawableGameObject
 from src.game.entities.road import ROAD_WIDTH, GAME_WIDTH, SCREEN_HEIGHT, LANE_WIDTH, LANE_COUNT_PER_DIRECTION, \
     PLAYER_SPEED
 from src.utils.collision_utils import check_rect_collision
 from src.utils.debug_utils import draw_hitbox, draw_real_hitbox
-from src.game.entities.base_drawable import DrawableGameObject
 
 
 class OilStain(DrawableGameObject):
