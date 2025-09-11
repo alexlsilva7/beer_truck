@@ -330,8 +330,7 @@ def draw_heart(x, y, size=8, color=(1.0, 0.3, 0.3), filled=True):
         for i in range(37):  # 36 pontos + volta ao início
             t = i * 2 * math.pi / 36
             # Equação paramétrica do coração
-            heart_x = x + size * (16 * math.sin(t)**3) / 16
-            heart_y = y + size * (13 * math.cos(t) - 5 * math.cos(2*t) - 2 * math.cos(3*t) - math.cos(4*t)) / 13
+            heart_x, heart_y = calculate_heart_point(t, x, y, size)
             glVertex2f(heart_x, heart_y)
         
         glEnd()
@@ -344,12 +343,17 @@ def draw_heart(x, y, size=8, color=(1.0, 0.3, 0.3), filled=True):
         for i in range(36):
             t = i * 2 * math.pi / 36
             # Equação paramétrica do coração
-            heart_x = x + size * (16 * math.sin(t)**3) / 16
-            heart_y = y + size * (13 * math.cos(t) - 5 * math.cos(2*t) - 2 * math.cos(3*t) - math.cos(4*t)) / 13
+            heart_x, heart_y = calculate_heart_point(t, x, y, size)
             glVertex2f(heart_x, heart_y)
         
         glEnd()
         glLineWidth(1.0)
+
+
+def calculate_heart_point(t, x, y, size):
+    heart_x = x + size * (16 * math.sin(t) ** 3) / 16
+    heart_y = y + size * (13 * math.cos(t) - 5 * math.cos(2 * t) - 2 * math.cos(3 * t) - math.cos(4 * t)) / 13
+    return heart_x, heart_y
 
 def main():
     global current_game_state, scroll_pos, player_truck, enemies_up, enemies_down, spawn_timer_up, spawn_timer_down, police_car, holes, hole_spawn_timer, oil_stains, oil_stain_spawn_timer, beer_collectibles, beer_spawn_timer, invulnerability_powerups, invulnerability_spawn_timer, score_indicators, pending_score_bonus, beer_bonus_points, sys, random, last_police_spawn_time, current_scale, current_offset, fb_height
