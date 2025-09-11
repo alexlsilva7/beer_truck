@@ -1,4 +1,3 @@
-# Ficheiro: enemy.py
 from OpenGL.GL import *
 import random
 from src.game.entities.road import ROAD_WIDTH, GAME_WIDTH, SCREEN_HEIGHT, LANE_WIDTH, LANE_COUNT_PER_DIRECTION, PLAYER_SPEED

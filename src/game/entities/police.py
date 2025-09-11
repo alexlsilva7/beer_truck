@@ -1,4 +1,3 @@
-# Ficheiro: police.py
 from OpenGL.GL import *
 from src.game.entities.road import SCREEN_HEIGHT, ROAD_WIDTH, GAME_WIDTH, PLAYER_SPEED
 from src.utils.debug_utils import draw_hitbox, draw_real_hitbox

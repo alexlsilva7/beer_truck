@@ -1,9 +1,9 @@
-# Ficheiro: hole.py
-from OpenGL.GL import *
 import random
-import math
-import time
-from src.game.entities.road import ROAD_WIDTH, GAME_WIDTH, SCREEN_HEIGHT, LANE_WIDTH, LANE_COUNT_PER_DIRECTION, PLAYER_SPEED
+
+from OpenGL.GL import *
+
+from src.game.entities.road import ROAD_WIDTH, GAME_WIDTH, SCREEN_HEIGHT, LANE_WIDTH, LANE_COUNT_PER_DIRECTION, \
+    PLAYER_SPEED
 from src.utils.collision_utils import check_rect_collision
 from src.utils.debug_utils import draw_hitbox, draw_real_hitbox
 
