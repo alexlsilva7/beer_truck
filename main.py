@@ -1,31 +1,30 @@
+import time
+
 import glfw
+import pygame
 from OpenGL.GL import *
 from OpenGL.GLU import *
 from OpenGL.GLUT import *
 from OpenGL.GLUT import GLUT_BITMAP_HELVETICA_18  # Importação explícita para evitar erro
-import sys
-import os
-import random
-import time
-import pygame
 
-from src.game.entities.road import draw_road, SCREEN_WIDTH, SCREEN_HEIGHT, GAME_WIDTH, PANEL_WIDTH, COLOR_PANEL, draw_rect, PLAYER_SPEED, \
-    ROAD_WIDTH, LANE_COUNT_PER_DIRECTION, LANE_WIDTH
-import src.game.entities.road as road
-from src.game.entities.truck import Truck
-from src.game.entities.enemy import Enemy, EnemyDown
 import src.game.entities.police as police
-from src.game.entities.hole import Hole
-from src.game.entities.oil_stain import OilStain
+import src.game.entities.road as road
+import src.game.managers.audio_manager as audio_manager
 from src.game.entities.beer_collectible import BeerCollectible
-from src.utils.collision_utils import check_rect_collision
+from src.game.entities.enemy import Enemy, EnemyDown
+from src.game.entities.hole import Hole
 from src.game.entities.invulnerability import InvulnerabilityPowerUp
-from src.ui.score_indicator import ScoreIndicator
-from src.utils.texture_loader import load_texture
-from src.ui.menu import MenuState, draw_start_menu, draw_instructions_screen, draw_game_over_menu, draw_name_input_screen, draw_lives, draw_pause_menu
+from src.game.entities.oil_stain import OilStain
+from src.game.entities.road import draw_road, SCREEN_WIDTH, SCREEN_HEIGHT, GAME_WIDTH, PANEL_WIDTH, COLOR_PANEL, \
+    draw_rect, PLAYER_SPEED, \
+    LANE_COUNT_PER_DIRECTION
+from src.game.entities.truck import Truck
 from src.game.managers.difficulty_manager import DifficultyManager
 from src.game.managers.high_score_manager import HighScoreManager
-import src.game.managers.audio_manager as audio_manager
+from src.ui.menu import MenuState, draw_start_menu, draw_instructions_screen, draw_game_over_menu, \
+    draw_name_input_screen, draw_pause_menu
+from src.ui.score_indicator import ScoreIndicator
+from src.utils.texture_loader import load_texture
 
 # --- Estados do Jogo ---
 GAME_STATE_MENU = 0
