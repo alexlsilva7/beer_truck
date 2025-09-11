@@ -7,7 +7,7 @@ import pygame
 from OpenGL.GL import *
 from OpenGL.GLU import *
 from OpenGL.GLUT import *
-from OpenGL.GLUT import GLUT_BITMAP_HELVETICA_18  # Importação explícita para evitar erro
+from OpenGL.GLUT import GLUT_BITMAP_HELVETICA_18
 
 import src.game.entities.police as police
 import src.game.entities.road as road
