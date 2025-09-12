@@ -1,73 +1,75 @@
-# Beer Truck - Projeto OpenGL
+# Beer Truck - Projeto OpenGL 🍺🚚
 
-Este é um projeto de jogo desenvolvido com Python e OpenGL.
+“Bem-vindos ao Beer Truck! Aqui você é o motorista de um caminhão de cerveja tentando cruzar a cidade sem virar estatística. A missão? Pontuar o máximo possível desviando de tudo — carros, buracos e, claro, da polícia.
 
-Versão do Python: 3.13.6
+A vibe é de corrida arcade com sobrevivência: quanto mais você aguenta na pista, mais caótico fica. Mais tráfego, mais buracos, mais poças de óleo… mas também mais power-ups. É um jogo de reflexo e estratégia: saber quando arriscar e quando jogar no seguro.
 
-Recomendado utilizar o PyCharm que possui suporte nativo para projetos Python e facilita a gestão de ambientes virtuais.
+Seu objetivo final: entrar no Top 3 do placar. Se conseguir, o jogo pede seu nome pra registrar essa lenda.”
 
-## Configuração do Ambiente Virtual
+---
+![Screenshot do Jogo](assets/game.png)
 
-### 1. Verificar se o venv está instalado:
-```cmd
-python -m venv --help
-```
 
-Se o comando acima retornar erro, instale o venv:
+## Integrantes do Grupo
 
-**Ubuntu/Debian:**
-```bash
-sudo apt install python3-venv
-```
+* Alex Lopes
+* Victor Saraiva
+* Clauderson Xavier
+* Aline Fernanda
 
-**CentOS/RHEL/Fedora:**
-```bash
-sudo yum install python3-venv
-# ou para versões mais recentes:
-sudo dnf install python3-venv
-```
+---
 
-**Windows/Mac:**
-O venv já vem incluído com Python 3.3+
+## Disciplina
 
-### 2. Criar o ambiente virtual:
-```cmd
-python -m venv .venv
-```
+Este projeto foi desenvolvido para a disciplina de **Computação Gráfica (2025.1)** do curso de **Ciência da Computação** da **Universidade Federal do Agreste de Pernambuco (UFAPE)**.
 
-### 3. Ativar o ambiente virtual:
+---
 
-**Windows (Command Prompt):**
-```cmd
-.venv\Scripts\activate.bat
-```
+## Como Jogar
 
-**Windows (PowerShell):**
-```powershell
-.venv\Scripts\Activate.ps1
-```
+### Versão Executável (Windows)
 
-**Linux/Mac ou Git Bash:**
-```bash
-source .venv/bin/activate
-```
+A maneira mais fácil de jogar é baixando o executável para Windows. Não precisa instalar nada!
 
-### 4. Instalar dependências:
-```cmd
-pip install -r requirements.txt
-```
+➡️ **[Baixar beer_truck.1.0.exe](https://github.com/alexlsilva7/beer_truck/releases/download/1.0/beer_truck.1.0.exe)**
 
-### 5. Desativar o ambiente virtual:
-```cmd
-deactivate
-```
+### Executando pelo Código-Fonte
 
-## Dependências incluídas:
-- **PyOpenGL 3.1.9** - Biblioteca para programação OpenGL
-- **PyGLFW 2.7.0** - Biblioteca para criação de janelas OpenGL
-- **Pillow 10.4.0** - Biblioteca para manipulação de imagens
-- **numpy 2.1.1** - Biblioteca para computação científica
+Se preferir, você pode rodar o projeto diretamente do código-fonte:
 
-## Como executar:
-```cmd
-python main.py
+1.  **Crie e ative um ambiente virtual:**
+    ```bash
+    # Cria o ambiente
+    python -m venv .venv
+
+    # Ativa no Windows (Git Bash, Linux ou Mac)
+    source .venv/bin/activate
+
+    # Ativa no Windows (CMD)
+    # .venv\Scripts\activate.bat
+    ```
+
+2.  **Instale as dependências:**
+    ```bash
+    pip install -r requirements.txt
+    ```
+
+3.  **Execute o jogo:**
+    ```bash
+    python main.py
+    ```
+---
+
+### Controles
+
+O jogo tem suporte para teclado и controle (joystick).
+
+#### Teclado
+* **Setas Direcionais:** Mover, Acelerar e Frear
+* **Barra de Espaço:** Buzinar
+* **ESC:** Pausar o jogo ou voltar ao menu
+* **Alt + Enter:** Alternar para tela cheia
+
+#### Controle / Joystick
+* **Analógico / D-Pad:** Mover, Acelerar e Frear
+* **Botão 'X' (Padrão PS2):** Buzinar
